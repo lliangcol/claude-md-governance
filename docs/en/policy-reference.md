@@ -7,7 +7,7 @@ Policy path: `.claude-governance/policy.json`.
 ## Top-level fields
 
 - `version`: schema version; current templates use `2`.
-- `preset`: `generic`, `java-maven`, or `onm-agent`.
+- `preset`: `generic`, `java-maven`, or `enterprise-java-codeup`.
 - `score_threshold`: lint pass threshold, default `75`.
 - `root_claude`: root `CLAUDE.md` path and line/token budgets.
 - `required_sections`: required headings, aliases, severity, and deduction.

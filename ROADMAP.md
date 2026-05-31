@@ -3,7 +3,7 @@
 ## v0.1
 
 - Publish starter kit v2.
-- Ship generic, java-maven, and onm-agent presets.
+- Ship generic, java-maven, and enterprise-java-codeup presets.
 - Deterministic linter, hook guard, verifier, and conservative autofix.
 
 ## v0.2

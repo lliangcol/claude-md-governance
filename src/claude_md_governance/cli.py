@@ -45,7 +45,7 @@ def build_parser() -> argparse.ArgumentParser:
     init_cmd.add_argument("--yes", action="store_true", help="Run non-interactively.")
     init_cmd.add_argument("--force", action="store_true", help="Overwrite managed files after backup.")
     init_cmd.add_argument("--skip-verify", action="store_true")
-    init_cmd.add_argument("--preset", default="generic", choices=["auto", "generic", "java-maven", "onm-agent"])
+    init_cmd.add_argument("--preset", default="generic", choices=["auto", "generic", "java-maven", "enterprise-java-codeup"])
     init_cmd.add_argument("--ci", default="auto", choices=["auto", "github", "codeup", "none"])
     init_cmd.add_argument("--config-change-mode", default="auto", choices=["auto", "block", "warn", "off"])
 

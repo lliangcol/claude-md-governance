@@ -7,7 +7,7 @@ policy 文件路径：`.claude-governance/policy.json`。
 ## 顶层字段
 
 - `version`：policy schema 版本，当前模板为 `2`。
-- `preset`：`generic`、`java-maven` 或 `onm-agent`。
+- `preset`：`generic`、`java-maven` 或 `enterprise-java-codeup`。
 - `score_threshold`：lint 通过分数线，默认 `75`。
 - `root_claude`：根 `CLAUDE.md` 路径、行数和 token 阈值。
 - `required_sections`：必需章节、别名、严重级别和扣分。

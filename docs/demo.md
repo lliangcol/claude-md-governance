@@ -7,7 +7,7 @@ Run:
 
 ```bash
 bash scripts/demo_generic.sh
-bash scripts/demo_onm_agent_like.sh
+bash scripts/demo_enterprise_java_codeup.sh
 bash scripts/demo_bad_repo.sh
 ```
 
@@ -16,7 +16,7 @@ Expected behavior:
 - Generic demo copies `examples/generic-node-like`, runs `init`, `lint`, and
   `verify`, installs `.github/workflows/claude-md-governance.yml`, and prints
   `score=<n> PASS ...`.
-- onm-agent-like demo copies `examples/onm-agent-like`, runs `init`, `lint`,
+- enterprise-java-codeup demo copies `examples/enterprise-java-codeup`, runs `init`, `lint`,
   and `verify`, installs Codeup documentation, does not install GitHub Actions,
   keeps `ConfigChange` in warning-only mode, and prints `score=<n> PASS ...`.
 - Bad repo demo copies `examples/bad-claude-md`, runs `init --skip-verify`,
@@ -29,6 +29,6 @@ Fixture-level smoke tests:
 ```bash
 bash examples/generic-node-like/scripts/smoke.sh
 bash examples/java-maven-like/scripts/smoke.sh
-bash examples/onm-agent-like/scripts/smoke.sh
+bash examples/enterprise-java-codeup/scripts/smoke.sh
 bash examples/bad-claude-md/scripts/smoke.sh
 ```

@@ -47,7 +47,7 @@ Supported presets:
 
 - `generic`: default, no Codeup assumption.
 - `java-maven`: Maven-oriented thresholds and sensitive-module patterns.
-- `onm-agent`: example Java/Maven team preset with Codeup defaults.
+- `enterprise-java-codeup`: example Java/Maven team preset with Codeup defaults.
 
 Supported CI modes:
 

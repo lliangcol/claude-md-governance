@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "preset": "onm-agent",
+  "preset": "enterprise-java-codeup",
   "score_threshold": 75,
   "root_claude": {
     "path": "CLAUDE.md",
@@ -181,6 +181,6 @@
   },
   "behavior_tests": {
     "enabled_by_default": false,
-    "case_file": "tests/ai_behavior_cases.onm-agent.json"
+    "case_file": "tests/ai_behavior_cases.enterprise-java-codeup.json"
   }
 }

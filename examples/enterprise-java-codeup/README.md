@@ -1,4 +1,4 @@
-# onm-agent-like Example
+# enterprise-java-codeup Example
 
 Blank starting state: this fixture intentionally has no `CLAUDE.md`. The
 payment-like module should be detected as sensitive and receive a local
@@ -7,7 +7,7 @@ payment-like module should be detected as sensitive and receive a local
 Expected:
 
 ```bash
-claude-md-governance init --repo <tmp> --preset onm-agent --ci codeup --config-change-mode warn --yes
+claude-md-governance init --repo <tmp> --preset enterprise-java-codeup --ci codeup --config-change-mode warn --yes
 claude-md-governance verify --repo <tmp>
 ```
 

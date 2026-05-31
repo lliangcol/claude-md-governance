@@ -23,7 +23,7 @@ if command -v python3 >/dev/null 2>&1; then
 else
   py=python
 fi
-run_gov init --repo "$tmp" --preset onm-agent --ci codeup --config-change-mode warn --yes
+run_gov init --repo "$tmp" --preset enterprise-java-codeup --ci codeup --config-change-mode warn --yes
 run_gov lint --repo "$tmp" --output "$score_file" --quiet
 run_gov verify --repo "$tmp"
 test ! -f "$tmp/.github/workflows/claude-md-governance.yml"
@@ -32,4 +32,4 @@ test -f "$tmp/src/main/java/example/payment/CLAUDE.md"
 config_mode="$("$py" -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["hooks"]["config_change_mode"])' "$tmp/.claude-governance/policy.json")"
 test "$config_mode" = "warn"
 score="$("$py" -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["score"])' "$score_file")"
-echo "score=$score PASS onm-agent-like smoke: $tmp"
+echo "score=$score PASS enterprise-java-codeup smoke: $tmp"

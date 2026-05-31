@@ -42,7 +42,7 @@ def test_template_resources_exist() -> None:
     root = template_root()
     assert (root / "policies" / "generic.json").exists()
     assert (root / "policies" / "java-maven.json").exists()
-    assert (root / "policies" / "onm-agent.json").exists()
+    assert (root / "policies" / "enterprise-java-codeup.json").exists()
     assert (root / "common" / "scripts" / "claude_md_lint.py").exists()
     assert (root / "common" / ".claude" / "skills" / "claude-md-governance" / "SKILL.md").exists()
     assert (root / "github" / "workflows" / "claude-md-governance.yml").exists()
@@ -149,7 +149,7 @@ def test_autofix_repairs_current_repo_without_score_file(tmp_path: Path) -> None
 
 def test_codeup_init_does_not_create_github_actions(tmp_path: Path) -> None:
     repo = make_repo(tmp_path, "codeup")
-    proc = run_cli("init", "--repo", str(repo), "--preset", "onm-agent", "--ci", "codeup", "--config-change-mode", "warn", "--yes")
+    proc = run_cli("init", "--repo", str(repo), "--preset", "enterprise-java-codeup", "--ci", "codeup", "--config-change-mode", "warn", "--yes")
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert not (repo / ".github" / "workflows" / "claude-md-governance.yml").exists()
     assert (repo / "docs" / "ci" / "codeup-claude-md-governance.md").exists()

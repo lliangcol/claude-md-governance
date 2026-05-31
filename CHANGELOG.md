@@ -13,5 +13,5 @@
 - Avoid GitHub Actions installation in Codeup-only projects.
 - Make ConfigChange behavior policy-controlled.
 - Add stricter hook validation.
-- Support Java/Maven and onm-agent section aliases.
+- Support Java/Maven and enterprise-java-codeup section aliases.
 - Execute allowlisted policy hook commands without shell chaining.

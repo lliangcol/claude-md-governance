@@ -10,7 +10,7 @@ Local migration inputs:
 
 - CLAUDE.md research report.
 - Generic CLAUDE.md governance execution plan.
-- onm-agent governance execution plan.
+- enterprise-java-codeup governance execution plan.
 - Starter kit archive.
 - Open-source prelaunch material archive.
 
@@ -20,7 +20,7 @@ These files are provenance for the migration, not repository dependencies.
 
 - Research summary -> `docs/research-basis.md`.
 - Generic v2 execution plan -> `docs/execution-plan.md`, `docs/architecture.md`, and `docs/security-model.md`.
-- onm-agent plan -> `docs/presets/onm-agent.md`.
+- enterprise-java-codeup plan -> `docs/presets/enterprise-java-codeup.md`.
 - Starter-kit scripts -> package modules plus compatibility templates under `src/claude_md_governance/data/templates/common/scripts/`.
 - Starter-kit policies -> `src/claude_md_governance/data/templates/policies/`.
 - Prelaunch open-source materials -> root governance files and `docs/`.

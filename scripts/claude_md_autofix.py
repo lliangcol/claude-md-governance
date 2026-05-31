@@ -236,7 +236,7 @@ def merge_hooks(repo: Path, policy: Dict[str, Any], dry_run: bool, backup_root: 
 def section_body(name: str, preset: str) -> str:
     lower = name.lower()
     if "do not" in lower:
-        if preset in {"java-maven", "onm-agent"}:
+        if preset in {"java-maven", "enterprise-java-codeup"}:
             return "- TODO: Add migrated-away dependencies and obsolete patterns with evidence.\n- Do not introduce new frameworks, new MQ types, new databases, or new DTO conventions without explicit approval.\n- Do not upgrade Spring Boot / Spring Cloud major versions without an explicit migration plan and tests.\n- Do not add Maven dependencies without supply-chain review and confirmation."
         return "- TODO: Add banned dependencies, obsolete patterns, and migrated-away technologies with evidence.\n- Do not introduce new frameworks, state managers, UI libraries, databases, or test runners without explicit approval."
     if "stack" in lower:
@@ -253,7 +253,7 @@ def section_body(name: str, preset: str) -> str:
 def local_template(module: str, preset: str, tests: List[str] | None = None) -> str:
     tests = tests or []
     test_lines = "\n".join(f"- `{cmd}`" for cmd in tests) or "- TODO: Add required checks for this module."
-    if preset in {"java-maven", "onm-agent"}:
+    if preset in {"java-maven", "enterprise-java-codeup"}:
         return f"""# {module} Module Rules
 
 This directory is treated as sensitive by CLAUDE.md governance.

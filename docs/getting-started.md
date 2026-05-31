@@ -26,19 +26,19 @@ Governance verification passed.
 - `Use --yes for non-interactive installation.`：补上 `--yes`。
 - `Governance verification failed`：读取失败项和 `.claude-governance/score.json`。
 
-## onm-agent / Codeup 示例
+## enterprise-java-codeup / Codeup 示例
 
 输入：
 
 ```bash
-claude-md-governance init --repo <repo> --preset onm-agent --ci codeup --config-change-mode warn --yes
+claude-md-governance init --repo <repo> --preset enterprise-java-codeup --ci codeup --config-change-mode warn --yes
 claude-md-governance verify --repo <repo>
 ```
 
 输出：
 
 ```text
-Preset: onm-agent; CI provider: codeup; ConfigChange mode: warn
+Preset: enterprise-java-codeup; CI provider: codeup; ConfigChange mode: warn
 Governance verification passed.
 ```
 

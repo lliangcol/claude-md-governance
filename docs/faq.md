@@ -24,7 +24,7 @@ claude-md-governance init --repo . --preset generic --ci none --yes
 ## 如何只生成 Codeup 示例？
 
 ```bash
-claude-md-governance init --repo . --preset onm-agent --ci codeup --config-change-mode warn --yes
+claude-md-governance init --repo . --preset enterprise-java-codeup --ci codeup --config-change-mode warn --yes
 ```
 
 失败处理：如果已有文件未覆盖，加 `--force`。

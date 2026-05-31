@@ -6,7 +6,7 @@ Behavior tests observe whether Claude CLI answers according to repository rules.
 
 ## Case format
 
-Files: `tests/ai_behavior_cases.json` or `tests/ai_behavior_cases.onm-agent.json`.
+Files: `tests/ai_behavior_cases.json` or `tests/ai_behavior_cases.enterprise-java-codeup.json`.
 
 Fields:
 

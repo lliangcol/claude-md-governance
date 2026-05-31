@@ -17,7 +17,7 @@ The copied scripts are compatibility entry points for downstream repositories. M
 
 - `policies/generic.json`: stack-neutral defaults.
 - `policies/java-maven.json`: Maven-sensitive module defaults.
-- `policies/onm-agent.json`: example team preset with Codeup defaults.
+- `policies/enterprise-java-codeup.json`: example team preset with Codeup defaults.
 
 ## CI Templates
 

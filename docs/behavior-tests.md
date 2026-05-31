@@ -6,7 +6,7 @@
 
 ## 用例格式
 
-文件：`tests/ai_behavior_cases.json` 或 `tests/ai_behavior_cases.onm-agent.json`。
+文件：`tests/ai_behavior_cases.json` 或 `tests/ai_behavior_cases.enterprise-java-codeup.json`。
 
 字段：
 

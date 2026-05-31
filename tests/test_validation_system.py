@@ -38,12 +38,12 @@ def test_policy_loading_defaults_and_aliases() -> None:
     assert policy["preset"] == "generic"
     assert policy["root_claude"]["max_lines"] == 200
     assert installer.detect_config_mode("auto", "generic") == "block"
-    assert installer.detect_config_mode("auto", "onm-agent") == "warn"
+    assert installer.detect_config_mode("auto", "enterprise-java-codeup") == "warn"
     assert lint.has_section("# 1. Overview\n", ["Project Overview", "Overview"])
 
 
 def test_cli_init_defaults_are_honored_by_wrapper(tmp_path: Path) -> None:
-    repo = make_repo(tmp_path, "onm-agent-name-should-not-change-cli-default")
+    repo = make_repo(tmp_path, "enterprise-java-codeup-name-should-not-change-cli-default")
     (repo / "pom.xml").write_text("<project></project>", encoding="utf-8")
     proc = run_cli("init", "--repo", str(repo))
     assert proc.returncode == 0, proc.stdout + proc.stderr
@@ -51,12 +51,12 @@ def test_cli_init_defaults_are_honored_by_wrapper(tmp_path: Path) -> None:
     assert policy["preset"] == "generic"
     assert policy["hooks"]["config_change_mode"] == "block"
 
-    onm_repo = make_repo(tmp_path, "explicit-onm-agent")
-    (onm_repo / "pom.xml").write_text("<project></project>", encoding="utf-8")
-    proc = run_cli("init", "--repo", str(onm_repo), "--preset", "onm-agent", "--ci", "codeup", "--yes")
+    enterprise_repo = make_repo(tmp_path, "explicit-enterprise-java-codeup")
+    (enterprise_repo / "pom.xml").write_text("<project></project>", encoding="utf-8")
+    proc = run_cli("init", "--repo", str(enterprise_repo), "--preset", "enterprise-java-codeup", "--ci", "codeup", "--yes")
     assert proc.returncode == 0, proc.stdout + proc.stderr
-    onm_policy = json.loads((onm_repo / ".claude-governance" / "policy.json").read_text(encoding="utf-8"))
-    assert onm_policy["hooks"]["config_change_mode"] == "warn"
+    enterprise_policy = json.loads((enterprise_repo / ".claude-governance" / "policy.json").read_text(encoding="utf-8"))
+    assert enterprise_policy["hooks"]["config_change_mode"] == "warn"
 
 
 def test_line_token_vague_import_and_section_rules(tmp_path: Path) -> None:
@@ -118,9 +118,9 @@ def test_integration_sample_repositories(tmp_path: Path) -> None:
     cases = [
         ("generic-repo", "generic", "github", None),
         ("java-maven-repo", "java-maven", "none", "pom.xml"),
-        ("onm-agent-like-repo", "onm-agent", "codeup", "pom.xml"),
+        ("enterprise-java-codeup-repo", "enterprise-java-codeup", "codeup", "pom.xml"),
         ("existing-settings-repo", "generic", "none", ".claude/settings.json"),
-        ("codeup-mode-repo", "onm-agent", "codeup", "pom.xml"),
+        ("codeup-mode-repo", "enterprise-java-codeup", "codeup", "pom.xml"),
     ]
     for name, preset, ci, marker in cases:
         repo = make_repo(tmp_path, name)
@@ -129,7 +129,7 @@ def test_integration_sample_repositories(tmp_path: Path) -> None:
         if marker == ".claude/settings.json":
             (repo / ".claude").mkdir()
             (repo / ".claude" / "settings.json").write_text(json.dumps({"hooks": {"PreToolUse": []}}), encoding="utf-8")
-        init = install(repo, preset, ci, "--config-change-mode", "warn" if "codeup" in name or preset == "onm-agent" else "block")
+        init = install(repo, preset, ci, "--config-change-mode", "warn" if "codeup" in name or preset == "enterprise-java-codeup" else "block")
         assert init.returncode == 0, init.stdout + init.stderr
         assert run_cli("lint", "--repo", str(repo), "--quiet").returncode == 0
         assert run_cli("verify", "--repo", str(repo)).returncode == 0
@@ -257,7 +257,7 @@ def test_lint_accepts_supported_hook_command_forms(tmp_path: Path) -> None:
 
 def test_verify_warn_config_change_accepts_warning_output(tmp_path: Path) -> None:
     repo = make_repo(tmp_path, "verify-warn")
-    init = install(repo, "onm-agent", "codeup", "--config-change-mode", "warn")
+    init = install(repo, "enterprise-java-codeup", "codeup", "--config-change-mode", "warn")
     assert init.returncode == 0, init.stdout + init.stderr
     verify = run_cli("verify", "--repo", str(repo))
     assert verify.returncode == 0, verify.stdout + verify.stderr
@@ -299,7 +299,7 @@ def test_existing_policy_sensitive_paths_are_preserved(tmp_path: Path) -> None:
         "--repo",
         str(repo),
         "--preset",
-        "onm-agent",
+        "enterprise-java-codeup",
         "--ci",
         "codeup",
         "--config-change-mode",
@@ -315,7 +315,7 @@ def test_existing_policy_sensitive_paths_are_preserved(tmp_path: Path) -> None:
 
 def test_maven_quality_commands_use_real_module_or_root(tmp_path: Path, monkeypatch) -> None:
     repo = make_repo(tmp_path, "maven-commands")
-    policy = json.loads(policy_path("onm-agent").read_text(encoding="utf-8"))
+    policy = json.loads(policy_path("enterprise-java-codeup").read_text(encoding="utf-8"))
     (repo / "pom.xml").write_text("<project></project>", encoding="utf-8")
     monkeypatch.chdir(repo)
     assert hook_guard.related_quality_commands(policy, "src/main/java/example/payment/PaymentService.java") == ["mvn test"]

@@ -14,7 +14,7 @@ labels: enhancement
 
 - [ ] generic
 - [ ] java-maven
-- [ ] onm-agent
+- [ ] enterprise-java-codeup
 - [ ] GitHub Actions
 - [ ] Codeup
 - [ ] other

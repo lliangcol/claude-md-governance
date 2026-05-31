@@ -3,7 +3,7 @@
 
 Usage:
   python install.py --repo /path/to/repo --yes
-  python install.py --repo /path/to/repo --yes --preset onm-agent --ci codeup --config-change-mode warn
+  python install.py --repo /path/to/repo --yes --preset enterprise-java-codeup --ci codeup --config-change-mode warn
 
 The installer is conservative:
 - It never deletes existing content.
@@ -99,10 +99,7 @@ def detect_preset(repo: Path, requested: str) -> str:
     if requested != "auto":
         return requested
     if (repo / "pom.xml").exists():
-        # Keep explicit onm-agent opt-in; otherwise use generic Java/Maven.
-        name = repo.name.lower()
-        if "onm" in name or "overseas" in name:
-            return "onm-agent"
+        # Keep enterprise Codeup behavior explicit; repo names should not imply a team preset.
         return "java-maven"
     if (repo / "package.json").exists():
         return "generic"
@@ -113,7 +110,7 @@ def detect_ci(repo: Path, requested: str, preset: str) -> str:
     if requested != "auto":
         return requested
     remote = git_remote(repo)
-    if "codeup.aliyun" in remote or preset == "onm-agent":
+    if "codeup.aliyun" in remote or preset == "enterprise-java-codeup":
         return "codeup"
     if "github.com" in remote or (repo / ".github").exists():
         return "github"
@@ -123,7 +120,7 @@ def detect_ci(repo: Path, requested: str, preset: str) -> str:
 def detect_config_mode(requested: str, preset: str) -> str:
     if requested != "auto":
         return requested
-    return "warn" if preset in {"java-maven", "onm-agent"} else "block"
+    return "warn" if preset in {"java-maven", "enterprise-java-codeup"} else "block"
 
 
 def load_policy_template(preset: str) -> Dict[str, Any]:
@@ -241,13 +238,13 @@ def section_body(name: str, stack: List[str], preset: str) -> str:
     if "stack" in lower:
         return "\n".join(f"- {item}" for item in stack)
     if "do not" in lower:
-        if preset in {"java-maven", "onm-agent"}:
+        if preset in {"java-maven", "enterprise-java-codeup"}:
             return "- TODO: Add migrated-away dependencies and obsolete patterns with evidence.\n- Do not introduce new frameworks, new MQ types, new databases, or new DTO conventions without explicit approval.\n- Do not upgrade Spring Boot / Spring Cloud major versions without an explicit migration plan and tests.\n- Do not add Maven dependencies without supply-chain review and confirmation."
         return "- TODO: Add banned dependencies, obsolete patterns, and migrated-away technologies with evidence.\n- Do not introduce new frameworks, state managers, UI libraries, databases, or test runners without explicit approval."
     if "architecture" in lower or "context" in lower:
         return "- Architecture overview: docs/architecture.md\n- API contracts: docs/api.md\n- Deployment runbook: docs/deploy.md\n- AI long-form context: docs/ai-context/\n- Archive/deprecated docs: docs/archive/ — do not read unless explicitly requested."
     if "rules" in lower:
-        if preset in {"java-maven", "onm-agent"}:
+        if preset in {"java-maven", "enterprise-java-codeup"}:
             return "- Controllers must not call persistence mappers directly.\n- Keep transaction boundaries explicit and avoid external network calls inside transactions.\n- Do not leave debug logs, commented-out code, or unowned TODOs.\n- Prefer existing repository patterns over introducing new abstractions."
         return "- Use explicit types at public boundaries.\n- Keep functions focused; split large functions when one function mixes validation, I/O, and transformation.\n- Do not leave commented-out code, debug logs, or unowned TODOs.\n- Prefer existing repository patterns over introducing new abstractions."
     if "change" in lower or "quality" in lower or "validation" in lower:
@@ -375,7 +372,7 @@ def rendered_tests(repo: Path, matched_dir: str, tests: Iterable[str]) -> List[s
 def local_claude_template(module: str, tests: Iterable[str], preset: str) -> str:
     tests = [str(t) for t in tests]
     test_lines = "\n".join(f"- `{cmd}`" for cmd in tests) or "- TODO: Add required checks for this module."
-    if preset in {"java-maven", "onm-agent"}:
+    if preset in {"java-maven", "enterprise-java-codeup"}:
         return f"""# {module} Module Rules
 
 This directory is treated as sensitive by CLAUDE.md governance.
@@ -491,7 +488,7 @@ def main() -> int:
     parser.add_argument("--yes", action="store_true", help="Non-interactive mode")
     parser.add_argument("--force", action="store_true", help="Overwrite starter-kit managed files after backup")
     parser.add_argument("--skip-verify", action="store_true")
-    parser.add_argument("--preset", default="auto", choices=["auto", "generic", "java-maven", "onm-agent"])
+    parser.add_argument("--preset", default="auto", choices=["auto", "generic", "java-maven", "enterprise-java-codeup"])
     parser.add_argument("--ci", default="auto", choices=["auto", "github", "codeup", "none"])
     parser.add_argument("--config-change-mode", default="auto", choices=["auto", "block", "warn", "off"])
     args = parser.parse_args()

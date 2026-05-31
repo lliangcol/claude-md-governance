@@ -8,7 +8,7 @@ This directory mirrors the Chinese documentation one-to-one.
 - [Concepts](concepts.md)
 - [Generic preset](presets/generic.md)
 - [Java Maven preset](presets/java-maven.md)
-- [onm-agent preset](presets/onm-agent.md)
+- [enterprise-java-codeup preset](presets/enterprise-java-codeup.md)
 - [Policy Reference](policy-reference.md)
 - [Hooks Reference](hooks-reference.md)
 - [GitHub CI](ci-github.md)

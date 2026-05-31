@@ -15,7 +15,7 @@ CLAUDE.md Governance turns Claude Code best practices into policy-as-code, hooks
 - Local CLAUDE.md for sensitive modules.
 - PreToolUse and PostToolUse hook guard.
 - GitHub, Codeup, and local-only modes.
-- Generic, Java/Maven, and onm-agent presets.
+- Generic, Java/Maven, and enterprise-java-codeup presets.
 
 ## CTA
 

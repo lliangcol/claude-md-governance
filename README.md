@@ -50,13 +50,13 @@ python -m pip install -e ".[dev]"
 
 - `generic`：通用仓库，默认 `ConfigChange` 为 `block`，适合 GitHub Actions。
 - `java-maven`：Java/Maven 仓库，敏感目录匹配 payment/order/refund/consumer/migration，默认 `ConfigChange` 为 `warn`。
-- `onm-agent`：面向 onm-agent 类 Java/Maven + Codeup 仓库，默认 CI provider 为 `codeup`，行为用例为 `tests/ai_behavior_cases.onm-agent.json`。
+- `enterprise-java-codeup`：面向 enterprise-java-codeup 类 Java/Maven + Codeup 仓库，默认 CI provider 为 `codeup`，行为用例为 `tests/ai_behavior_cases.enterprise-java-codeup.json`。
 - `auto`：根据 `pom.xml`、`package.json`、git remote 和目录名做保守推断；公开文档和 CI 中建议显式指定 preset。
 
-onm-agent / Codeup 示例：
+enterprise-java-codeup / Codeup 示例：
 
 ```bash
-claude-md-governance init --repo <repo> --preset onm-agent --ci codeup --config-change-mode warn --yes
+claude-md-governance init --repo <repo> --preset enterprise-java-codeup --ci codeup --config-change-mode warn --yes
 claude-md-governance verify --repo <repo>
 ```
 
@@ -96,7 +96,7 @@ python scripts/verify_claude_governance.py
 Codeup / 云效：
 
 ```bash
-claude-md-governance init --repo . --preset onm-agent --ci codeup --config-change-mode warn --yes
+claude-md-governance init --repo . --preset enterprise-java-codeup --ci codeup --config-change-mode warn --yes
 ```
 
 这会安装 `ci/codeup/claude-md-governance-step.yml` 和 `docs/ci/codeup-claude-md-governance.md`，把其中脚本加入 Codeup pipeline step。
@@ -125,7 +125,7 @@ claude-md-governance init --repo . --preset onm-agent --ci codeup --config-chang
 - [概念](docs/concepts.md) / [Concepts](docs/en/concepts.md)
 - [Generic preset](docs/presets/generic.md) / [English](docs/en/presets/generic.md)
 - [Java Maven preset](docs/presets/java-maven.md) / [English](docs/en/presets/java-maven.md)
-- [onm-agent preset](docs/presets/onm-agent.md) / [English](docs/en/presets/onm-agent.md)
+- [enterprise-java-codeup preset](docs/presets/enterprise-java-codeup.md) / [English](docs/en/presets/enterprise-java-codeup.md)
 - [Policy Reference](docs/policy-reference.md) / [English](docs/en/policy-reference.md)
 - [Hooks Reference](docs/hooks-reference.md) / [English](docs/en/hooks-reference.md)
 - [GitHub CI](docs/ci-github.md) / [English](docs/en/ci-github.md)

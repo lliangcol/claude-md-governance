@@ -24,7 +24,7 @@ Failure handling: still run `claude-md-governance verify --repo .` locally.
 ## How do I generate only a Codeup example?
 
 ```bash
-claude-md-governance init --repo . --preset onm-agent --ci codeup --config-change-mode warn --yes
+claude-md-governance init --repo . --preset enterprise-java-codeup --ci codeup --config-change-mode warn --yes
 ```
 
 Failure handling: use `--force` if managed files already exist.
