@@ -20,7 +20,7 @@ DEFAULT_POLICY_PATH = Path(os.environ.get("CLAUDE_GOVERNANCE_POLICY", ".claude-g
 
 
 def normalize_path(path: str) -> str:
-    raw = str(path).strip()
+    raw = str(path).strip().replace("\\", "/")
     if not raw:
         return ""
     candidate = Path(raw)
