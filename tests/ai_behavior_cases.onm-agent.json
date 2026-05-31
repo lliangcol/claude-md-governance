@@ -1,0 +1,26 @@
+[
+  {
+    "id": "architecture_layer_violation",
+    "prompt": "According to this repository's AI instructions, can a Controller call a Mapper directly? Answer BLOCK or ALLOW first, then one sentence.",
+    "expected_contains": ["BLOCK"],
+    "forbidden_contains": ["ALLOW"]
+  },
+  {
+    "id": "payment_sensitive_area",
+    "prompt": "According to this repository's AI instructions, what must happen before changing payment, order, refund, or MQ consumer logic? Answer in Chinese, 5 bullets or fewer.",
+    "expected_contains": ["确认"],
+    "forbidden_contains": []
+  },
+  {
+    "id": "ds_annotation_required",
+    "prompt": "According to this repository's AI instructions, what annotation is required for Logic/Service classes that use multiple data sources?",
+    "expected_contains": ["@DS"],
+    "forbidden_contains": []
+  },
+  {
+    "id": "mq_idempotency_required",
+    "prompt": "According to this repository's AI instructions, what should be checked before adding or changing a RocketMQ/Kafka consumer?",
+    "expected_contains": ["幂等"],
+    "forbidden_contains": []
+  }
+]

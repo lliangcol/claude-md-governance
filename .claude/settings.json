@@ -1,0 +1,37 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python scripts/claude_hook_guard.py pre"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python scripts/claude_hook_guard.py post"
+          }
+        ]
+      }
+    ],
+    "ConfigChange": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python scripts/claude_hook_guard.py config"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,41 @@
+[project]
+name = "claude-md-governance"
+version = "0.1.0"
+description = "Policy-as-code governance starter kit for CLAUDE.md quality"
+requires-python = ">=3.10"
+dependencies = []
+license = "MIT"
+license-files = ["LICENSE"]
+readme = "README.md"
+authors = [{name = "claude-md-governance maintainers"}]
+keywords = ["claude", "claude-code", "governance", "cli", "policy-as-code"]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+build = ["build>=1"]
+dev = ["pytest>=8", "build>=1"]
+
+[project.scripts]
+claude-md-governance = "claude_md_governance.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+claude_md_governance = [
+  "data/templates/**/*.json",
+  "data/templates/**/*.md",
+  "data/templates/**/*.py",
+  "data/templates/**/*.yml",
+  "data/templates/common/.claude/skills/claude-md-governance/SKILL.md",
+]
+
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[tool.ruff]
+line-length = 120
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,38 @@
+{
+  "version": 2,
+  "preset": "java-maven",
+  "score_threshold": 75,
+  "root_claude": {
+    "path": "CLAUDE.md",
+    "warn_lines": 180,
+    "max_lines": 230,
+    "hard_fail_lines": 280,
+    "warn_tokens": 4500,
+    "hard_fail_tokens": 6500
+  },
+  "required_sections": [
+    {"name": "Priority and Scope", "aliases": ["Project Overview", "Overview"], "severity": "warning", "deduction": 4},
+    {"name": "Architecture Boundaries", "aliases": ["Architecture", "Boundaries", "Context Map"], "severity": "warning", "deduction": 4},
+    {"name": "Core Engineering Rules", "aliases": ["Code Rules", "Coding Rules", "Development Rules"], "severity": "warning", "deduction": 4},
+    {"name": "Change Control", "aliases": ["Quality Gates", "Validation", "Verification"], "severity": "warning", "deduction": 4},
+    {"name": "Do NOT introduce", "aliases": ["Do not introduce", "Forbidden", "Prohibited", "禁止引入"], "severity": "error", "deduction": 8}
+  ],
+  "vague_phrases": {
+    "en": ["clean code", "best practices", "simple", "elegant", "robust", "performant", "maintainable", "high quality"],
+    "zh": ["干净的代码", "最佳实践", "保持简洁", "优雅", "健壮", "注重性能", "可维护", "高质量", "合理封装"]
+  },
+  "banned_dependencies": [],
+  "banned_dependency_suggestions": ["new framework", "new MQ", "new database", "new DTO convention"],
+  "context_map": {"allowed_import_max_lines": 40, "archive_paths": ["docs/archive/**", "docs/deprecated/**"]},
+  "sensitive_paths": [
+    {"id": "payment", "path": "**/pay*/**", "detect_keywords": ["pay", "payment"], "local_claude": "{dir}/CLAUDE.md", "required_tests": ["mvn -pl {module} -am test"], "protected": true},
+    {"id": "order", "path": "**/order*/**", "detect_keywords": ["order"], "local_claude": "{dir}/CLAUDE.md", "required_tests": ["mvn -pl {module} -am test"], "protected": true},
+    {"id": "refund", "path": "**/refund*/**", "detect_keywords": ["refund"], "local_claude": "{dir}/CLAUDE.md", "required_tests": ["mvn -pl {module} -am test"], "protected": true},
+    {"id": "mq-consumer", "path": "**/*consumer*/**", "detect_keywords": ["consumer", "mq", "rocketmq", "kafka"], "local_claude": "{dir}/CLAUDE.md", "required_tests": ["mvn -pl {module} -am test"], "protected": true},
+    {"id": "migration", "path": "**/*migration*/**", "detect_keywords": ["migration", "flyway", "liquibase"], "local_claude": "{dir}/CLAUDE.md", "required_tests": ["mvn -pl {module} -am test"], "protected": true}
+  ],
+  "protected_paths": [".claude/settings.json", ".claude/hooks/**", ".claude-governance/policy.json", "scripts/claude_hook_guard.py"],
+  "hooks": {"settings_path": ".claude/settings.json", "require_pretool_guard": true, "require_posttool_quality_gate": true, "protected_config_review_required": true, "config_change_mode": "warn"},
+  "ci": {"provider": "auto"},
+  "behavior_tests": {"enabled_by_default": false, "case_file": "tests/ai_behavior_cases.json"}
+}

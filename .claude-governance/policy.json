@@ -1,0 +1,178 @@
+{
+  "version": 2,
+  "preset": "generic",
+  "score_threshold": 75,
+  "root_claude": {
+    "path": "CLAUDE.md",
+    "warn_lines": 160,
+    "max_lines": 200,
+    "hard_fail_lines": 220,
+    "warn_tokens": 3500,
+    "hard_fail_tokens": 5000
+  },
+  "required_sections": [
+    {
+      "name": "Project Overview",
+      "aliases": [
+        "Priority and Scope",
+        "Overview"
+      ],
+      "severity": "warning",
+      "deduction": 4
+    },
+    {
+      "name": "Tech Stack",
+      "aliases": [
+        "Technology Stack",
+        "Stack"
+      ],
+      "severity": "warning",
+      "deduction": 4
+    },
+    {
+      "name": "Do NOT introduce",
+      "aliases": [
+        "Do not introduce",
+        "Forbidden",
+        "Prohibited",
+        "禁止引入"
+      ],
+      "severity": "error",
+      "deduction": 8
+    },
+    {
+      "name": "Code Rules",
+      "aliases": [
+        "Core Engineering Rules",
+        "Coding Rules",
+        "Development Rules"
+      ],
+      "severity": "warning",
+      "deduction": 4
+    },
+    {
+      "name": "Context Map",
+      "aliases": [
+        "Documentation Map",
+        "References",
+        "Context Router"
+      ],
+      "severity": "warning",
+      "deduction": 4
+    },
+    {
+      "name": "Quality Gates",
+      "aliases": [
+        "Validation",
+        "Verification",
+        "Change Control"
+      ],
+      "severity": "warning",
+      "deduction": 4
+    },
+    {
+      "name": "Working Style",
+      "aliases": [
+        "Collaboration Style",
+        "Communication",
+        "Workflow"
+      ],
+      "severity": "warning",
+      "deduction": 4
+    }
+  ],
+  "vague_phrases": {
+    "en": [
+      "clean code",
+      "best practices",
+      "simple",
+      "elegant",
+      "robust",
+      "performant",
+      "maintainable",
+      "high quality"
+    ],
+    "zh": [
+      "干净的代码",
+      "最佳实践",
+      "保持简洁",
+      "优雅",
+      "健壮",
+      "注重性能",
+      "可维护",
+      "高质量",
+      "合理封装"
+    ]
+  },
+  "banned_dependencies": [],
+  "banned_dependency_suggestions": [
+    "redux",
+    "styled-components",
+    "@mui/material",
+    "mongodb",
+    "jest"
+  ],
+  "context_map": {
+    "allowed_import_max_lines": 40,
+    "archive_paths": [
+      "docs/archive/**",
+      "docs/deprecated/**"
+    ]
+  },
+  "sensitive_paths": [
+    {
+      "id": "auth",
+      "path": "src/auth/**",
+      "local_claude": "src/auth/CLAUDE.md",
+      "required_tests": [],
+      "protected": true
+    },
+    {
+      "id": "billing",
+      "path": "src/billing/**",
+      "local_claude": "src/billing/CLAUDE.md",
+      "required_tests": [],
+      "protected": true
+    },
+    {
+      "id": "payments",
+      "path": "src/payments/**",
+      "local_claude": "src/payments/CLAUDE.md",
+      "required_tests": [],
+      "protected": true
+    },
+    {
+      "id": "migrations",
+      "path": "prisma/migrations/**",
+      "local_claude": "prisma/CLAUDE.md",
+      "required_tests": [],
+      "protected": true
+    },
+    {
+      "id": "infra",
+      "path": "infra/**",
+      "local_claude": "infra/CLAUDE.md",
+      "required_tests": [],
+      "protected": true
+    }
+  ],
+  "protected_paths": [
+    ".claude/settings.json",
+    ".claude-governance/policy.json",
+    "scripts/claude_hook_guard.py"
+  ],
+  "hooks": {
+    "settings_path": ".claude/settings.json",
+    "require_pretool_guard": true,
+    "require_posttool_quality_gate": true,
+    "protected_config_review_required": true,
+    "config_change_mode": "block"
+  },
+  "ci": {
+    "provider": "github"
+  },
+  "behavior_tests": {
+    "enabled_by_default": false,
+    "case_file": "tests/ai_behavior_cases.json"
+  }
+}

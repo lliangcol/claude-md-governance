@@ -1,0 +1,25 @@
+# Manifest
+
+- `.github/ISSUE_TEMPLATE/bug_report.md`
+- `.github/ISSUE_TEMPLATE/feature_request.md`
+- `.github/ISSUE_TEMPLATE/governance_rule_request.md`
+- `.github/PULL_REQUEST_TEMPLATE.md`
+- `.github/workflows/ci.yml`
+- `CHANGELOG.md`
+- `CODE_OF_CONDUCT.md`
+- `CONTRIBUTING.md`
+- `GOVERNANCE.md`
+- `LICENSE`
+- `README.md`
+- `ROADMAP.md`
+- `SECURITY.md`
+- `docs/adr/ADR-0001-policy-as-code.md`
+- `docs/adr/ADR-0002-hooks-as-hard-gates.md`
+- `docs/adr/ADR-0003-ci-and-bare-eval.md`
+- `docs/architecture.md`
+- `docs/landing-page-copy.md`
+- `docs/maintainer-playbook.md`
+- `docs/project-charter.md`
+- `docs/release-checklist.md`
+- `docs/research-basis.md`
+- `pyproject.toml`

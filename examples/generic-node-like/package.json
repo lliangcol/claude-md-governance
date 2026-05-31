@@ -1,0 +1,10 @@
+{
+  "name": "generic-node-like",
+  "private": true,
+  "scripts": {
+    "test": "echo ok"
+  },
+  "dependencies": {
+    "typescript": "^5.0.0"
+  }
+}

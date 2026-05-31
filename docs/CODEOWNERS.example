@@ -1,0 +1,5 @@
+# Example CODEOWNERS for downstream projects.
+* @maintainers
+/.claude/ @maintainers
+/.claude-governance/ @maintainers
+/CLAUDE.md @maintainers

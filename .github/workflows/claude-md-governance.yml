@@ -1,0 +1,31 @@
+name: CLAUDE.md Governance
+
+on:
+  pull_request:
+    paths:
+      - "CLAUDE.md"
+      - "**/CLAUDE.md"
+      - ".claude/**"
+      - ".claude-governance/**"
+      - "scripts/claude_*"
+      - "tests/ai_behavior_cases*.json"
+  push:
+    branches:
+      - main
+
+jobs:
+  governance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Static lint
+        run: |
+          python scripts/claude_md_lint.py \
+            --policy .claude-governance/policy.json \
+            --output .claude-governance/score.json
+      - name: Governance smoke tests
+        run: |
+          python scripts/verify_claude_governance.py
