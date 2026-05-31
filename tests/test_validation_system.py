@@ -6,7 +6,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from claude_md_governance import behavior, hook_guard, installer, lint
+from claude_md_governance import behavior, hook_guard, installer, lint, verify
 from claude_md_governance.templates import policy_path
 
 
@@ -200,6 +200,117 @@ def test_lint_rejects_invalid_hook_type_and_mode_prefix(tmp_path: Path) -> None:
     }
     settings.write_text(json.dumps(data), encoding="utf-8")
     assert run_cli("lint", "--repo", str(repo), "--quiet").returncode == 1
+
+
+def test_lint_accepts_supported_hook_command_forms(tmp_path: Path) -> None:
+    command_sets = [
+        (
+            "bare-python",
+            {
+                "pre": "python scripts/claude_hook_guard.py pre",
+                "post": "python scripts/claude_hook_guard.py post",
+                "config": "python scripts/claude_hook_guard.py config",
+            },
+        ),
+        (
+            "module-cli",
+            {
+                "pre": "python -m claude_md_governance.cli hook pre",
+                "post": "python -m claude_md_governance.cli hook post",
+                "config": "python -m claude_md_governance.cli hook config",
+            },
+        ),
+        (
+            "node-wrapper",
+            {
+                "pre": 'node "$CLAUDE_PROJECT_DIR/.claude/hooks/run-python-hook.js" "$CLAUDE_PROJECT_DIR/scripts/claude_hook_guard.py" pre',
+                "post": 'node "$CLAUDE_PROJECT_DIR/.claude/hooks/run-python-hook.js" "$CLAUDE_PROJECT_DIR/scripts/claude_hook_guard.py" post',
+                "config": 'node "$CLAUDE_PROJECT_DIR/.claude/hooks/run-python-hook.js" "$CLAUDE_PROJECT_DIR/scripts/claude_hook_guard.py" config',
+            },
+        ),
+    ]
+    for name, commands in command_sets:
+        repo = make_repo(tmp_path, name)
+        assert install(repo).returncode == 0
+        settings = repo / ".claude" / "settings.json"
+        settings.write_text(
+            json.dumps(
+                {
+                    "hooks": {
+                        "PreToolUse": [
+                            {"matcher": "Edit|Write|MultiEdit", "hooks": [{"type": "command", "command": commands["pre"]}]}
+                        ],
+                        "PostToolUse": [
+                            {"matcher": "Edit|Write|MultiEdit", "hooks": [{"type": "command", "command": commands["post"]}]}
+                        ],
+                        "ConfigChange": [
+                            {"matcher": "", "hooks": [{"type": "command", "command": commands["config"]}]}
+                        ],
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+        proc = run_cli("lint", "--repo", str(repo), "--quiet")
+        assert proc.returncode == 0, name + proc.stdout + proc.stderr
+
+
+def test_verify_warn_config_change_accepts_warning_output(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path, "verify-warn")
+    init = install(repo, "onm-agent", "codeup", "--config-change-mode", "warn")
+    assert init.returncode == 0, init.stdout + init.stderr
+    verify = run_cli("verify", "--repo", str(repo))
+    assert verify.returncode == 0, verify.stdout + verify.stderr
+    assert "PASS: ConfigChange warn emits warning and does not block" in verify.stdout
+
+
+def test_verify_compatibility_defaults_and_optional_autofix(tmp_path: Path) -> None:
+    assert verify.config_change_mode({"hooks": {"config_change_mode": "block", "protected_config_review_required": False}}) == "block"
+    assert verify.config_change_mode({"hooks": {"config_change_mode": "warn"}}) == "warn"
+    assert verify.config_change_mode({"hooks": {"config_change_mode": "off"}}) == "off"
+    assert verify.config_change_mode({"hooks": {"protected_config_review_required": False}}) == "warn"
+
+    repo = make_repo(tmp_path, "missing-autofix")
+    assert install(repo).returncode == 0
+    (repo / "scripts" / "claude_md_autofix.py").unlink()
+    proc = run_cli("verify", "--repo", str(repo))
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
+def test_existing_policy_sensitive_paths_are_preserved(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path, "existing-policy")
+    policy_path = repo / ".claude-governance" / "policy.json"
+    policy_path.parent.mkdir()
+    exact_sensitive_paths = [
+        {
+            "id": "exact-payment-service",
+            "path": "services/payment/src/main/java/**",
+            "local_claude": "services/payment/CLAUDE.md",
+            "required_tests": ["mvn -pl services/payment test"],
+            "protected": True,
+        }
+    ]
+    policy_path.write_text(
+        json.dumps({"version": 99, "preset": "custom", "sensitive_paths": exact_sensitive_paths}, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    proc = run_cli(
+        "init",
+        "--repo",
+        str(repo),
+        "--preset",
+        "onm-agent",
+        "--ci",
+        "codeup",
+        "--config-change-mode",
+        "warn",
+        "--yes",
+        "--skip-verify",
+    )
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    merged = json.loads(policy_path.read_text(encoding="utf-8"))
+    assert merged["sensitive_paths"] == exact_sensitive_paths
+    assert merged["hooks"]["config_change_mode"] == "warn"
 
 
 def test_maven_quality_commands_use_real_module_or_root(tmp_path: Path, monkeypatch) -> None:

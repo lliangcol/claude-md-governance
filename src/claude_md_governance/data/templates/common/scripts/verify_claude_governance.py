@@ -40,6 +40,16 @@ def json_status(output: str) -> str:
     return str(payload.get("status", ""))
 
 
+def config_change_mode(policy: Dict) -> str:
+    hooks = policy.get("hooks", {})
+    configured = str(hooks.get("config_change_mode", "")).lower()
+    if configured in {"block", "warn", "off"}:
+        return configured
+    if hooks.get("protected_config_review_required") is False:
+        return "warn"
+    return "block"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo", default=".")
@@ -57,7 +67,6 @@ def main() -> int:
         ".claude-governance/policy.json",
         "scripts/claude_md_lint.py",
         "scripts/claude_hook_guard.py",
-        "scripts/claude_md_autofix.py",
     ]
     for rel in required:
         assert_true(Path(rel).exists(), f"required file exists: {rel}", failures)
@@ -89,12 +98,16 @@ def main() -> int:
     proc_open = run([sys.executable, "scripts/claude_hook_guard.py", "pre"], input_text=unprotected_event)
     assert_true(proc_open.returncode == 0, "PreToolUse allows unprotected edit", failures)
 
-    cfg_mode = policy.get("hooks", {}).get("config_change_mode", "block")
+    cfg_mode = config_change_mode(policy)
     cfg_event = json.dumps({"config_key": "model", "new_value": "example"})
     cfg_proc = run([sys.executable, "scripts/claude_hook_guard.py", "config"], input_text=cfg_event)
-    expected = 2 if cfg_mode == "block" else 0
-    label = "ConfigChange blocks" if cfg_mode == "block" else f"ConfigChange is {cfg_mode} (non-blocking)"
-    assert_true(cfg_proc.returncode == expected, label, failures)
+    if cfg_mode == "block":
+        assert_true(cfg_proc.returncode == 2, "ConfigChange blocks", failures)
+    elif cfg_mode == "warn":
+        output = cfg_proc.stdout + cfg_proc.stderr
+        assert_true(cfg_proc.returncode == 0 and "WARNING" in output, "ConfigChange warn emits warning and does not block", failures)
+    else:
+        assert_true(cfg_proc.returncode == 0, f"ConfigChange is {cfg_mode} (non-blocking)", failures)
 
     with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix="_CLAUDE.md", delete=False) as f:
         f.write(("# Project Overview\n\n保持简洁。高质量。注重性能。\n") * 80)

@@ -196,12 +196,23 @@ def guard_command_matches(command: str, mode: str) -> bool:
     if not argv:
         return False
     exe = Path(argv[0]).name.lower()
+    def path_endswith(arg: str, suffix: str) -> bool:
+        normalized = arg.strip("\"'").replace("\\", "/")
+        return normalized == suffix or normalized.endswith("/" + suffix)
+
     if exe in {"python", "python.exe", "python3", "python3.exe", "py", "py.exe"}:
-        if len(argv) == 3 and argv[1] == "scripts/claude_hook_guard.py":
+        if len(argv) == 3 and path_endswith(argv[1], "scripts/claude_hook_guard.py"):
             return argv[2] == mode
         if len(argv) == 5 and argv[1] == "-m" and argv[2] in {"claude_md_governance.cli", "claude_md_governance"}:
             return argv[3] == "hook" and argv[4] == mode
         return False
+    if exe in {"node", "node.exe"}:
+        return (
+            len(argv) == 4
+            and path_endswith(argv[1], ".claude/hooks/run-python-hook.js")
+            and path_endswith(argv[2], "scripts/claude_hook_guard.py")
+            and argv[3] == mode
+        )
     return len(argv) == 3 and exe in {"claude-md-governance", "claude-md-governance.exe"} and argv[1] == "hook" and argv[2] == mode
 
 
