@@ -1,6 +1,6 @@
 # CLAUDE.md Governance Documentation
 
-Chinese README: [../../README.md](../../README.md)
+Project README: [../../README.md](../../README.md)
 
 This directory mirrors the Chinese documentation one-to-one.
 
@@ -19,3 +19,5 @@ This directory mirrors the Chinese documentation one-to-one.
 - [Architecture](architecture.md)
 - [Research Basis](research-basis.md)
 - [FAQ](faq.md)
+- [Release Checklist](../release-checklist.md)
+- [Launch Plan](../launch-plan.md)

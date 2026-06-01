@@ -12,8 +12,8 @@ keywords = ["claude", "claude-code", "governance", "cli", "policy-as-code"]
 
 [project.optional-dependencies]
 test = ["pytest>=8"]
-build = ["build>=1"]
-dev = ["pytest>=8", "build>=1"]
+build = ["build>=1", "twine>=5"]
+dev = ["pytest>=8", "build>=1", "twine>=5"]
 
 [project.scripts]
 claude-md-governance = "claude_md_governance.cli:main"

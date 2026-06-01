@@ -27,4 +27,4 @@ Please open a private security advisory or contact the maintainers once the publ
 
 ## Release workflow
 
-The release workflow builds on tag pushes only. It does not publish artifacts and must not contain credential values. If publishing is added later, use GitHub secrets by name only and document the manual approval path.
+The release workflow builds on tag pushes only and uploads `dist/*` to the matching GitHub Release with the repository `GITHUB_TOKEN`. It does not publish to PyPI and must not contain credential values. If package publishing is added later, use GitHub secrets by name only or Trusted Publishing, and document the manual approval path.

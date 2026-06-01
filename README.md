@@ -1,32 +1,38 @@
 # CLAUDE.md Governance
 
-`claude-md-governance` 是一个 Python CLI，用 policy-as-code 管理 Claude Code 项目的 `CLAUDE.md`、hook、CI 和验证报告。它面向开源仓库和团队仓库：安装后会生成可审计的规则、保护敏感路径，并用确定性检查发现 `CLAUDE.md` 过长、规则空泛、hook 缺失或本地模块规则缺失等问题。
+Keep `CLAUDE.md` short. Make rules enforceable. Stop context drift.
 
-English docs: [docs/en/README.md](docs/en/README.md)
+Make Claude Code repo rules enforceable with policy-as-code, hooks, and CI.
 
-## 解决什么问题
+[![CI](https://github.com/lliangcol/claude-md-governance/actions/workflows/ci.yml/badge.svg)](https://github.com/lliangcol/claude-md-governance/actions/workflows/ci.yml)
+[![Governance](https://github.com/lliangcol/claude-md-governance/actions/workflows/claude-md-governance.yml/badge.svg)](https://github.com/lliangcol/claude-md-governance/actions/workflows/claude-md-governance.yml)
+[![Release](https://img.shields.io/github/v/release/lliangcol/claude-md-governance?include_prereleases&label=release)](https://github.com/lliangcol/claude-md-governance/releases)
+[![Python](https://img.shields.io/badge/python-3.10%2B-3776ab)](pyproject.toml)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-只写一个很长的 `CLAUDE.md` 不够。规则会漂移，敏感目录可能没有本地说明，`@import` 可能把大段上下文塞进常驻提示，hook 配置可能被改掉，CI 也无法判断规则是否仍然可执行。
+![CLAUDE.md governance demo](docs/assets/demo-governance-flow.gif)
 
-本项目把这些约束拆成：
+## Quickstart
 
-- `CLAUDE.md`：短的根上下文和入口地图。
-- `.claude-governance/policy.json`：可版本化的规则、阈值、敏感路径和 CI 配置。
-- `.claude/settings.json`：Claude Code hook 注册。
-- `scripts/claude_*`：仓库本地的确定性 lint、hook guard、autofix 和 verify。
-- 可选行为测试：通过 Claude CLI 运行提示词回归，但不作为默认确定性门禁。
-
-## 30 秒安装
-
-输入：
+Until a PyPI release is published, the public install path is the GitHub Release
+wheel or a source checkout. Do not use a PyPI badge or `pip install
+claude-md-governance` until that package is live.
 
 ```bash
-pip install claude-md-governance
-claude-md-governance init --repo . --preset generic --ci github --yes
-claude-md-governance verify --repo .
+python -m pip install -e ".[test]"
+claude-md-governance init --repo <your-repo> --preset generic --ci github --yes
+claude-md-governance verify --repo <your-repo>
 ```
 
-成功输出会包含：
+After `v0.1.0` is published on GitHub Releases, the wheel install path is:
+
+```bash
+python -m pip install "https://github.com/lliangcol/claude-md-governance/releases/download/v0.1.0/claude_md_governance-0.1.0-py3-none-any.whl"
+claude-md-governance init --repo <your-repo> --preset generic --ci github --yes
+claude-md-governance verify --repo <your-repo>
+```
+
+Expected success output includes:
 
 ```text
 Installed CLAUDE.md governance into <repo>
@@ -34,105 +40,109 @@ Preset: generic; CI provider: github; ConfigChange mode: block
 Governance verification passed.
 ```
 
-失败处理：
+## What It Does
 
-- `Repo not found`：确认 `--repo` 指向存在的仓库根目录。
-- `Policy file not found`：先运行 `init`，或检查 `.claude-governance/policy.json` 是否被删除。
-- `static linter passes` 失败：打开 `.claude-governance/score.json`，按 finding 修复 `CLAUDE.md` 或 policy。
+- Installs a short root `CLAUDE.md` with enforceable repo rules.
+- Adds versioned policy files under `.claude-governance/`.
+- Registers Claude Code `PreToolUse`, `PostToolUse`, and `ConfigChange` hooks.
+- Runs deterministic lint and verify checks locally and in CI.
+- Creates local module rules for sensitive paths when a preset detects them.
 
-本地开发安装：
+## Why Not Just Write A Bigger `CLAUDE.md`?
+
+| Bigger `CLAUDE.md` | CLAUDE.md Governance |
+| --- | --- |
+| Rules are only context. | Rules become policy, hooks, and CI checks. |
+| Context grows until it is hard to scan. | Root instructions stay short and link to focused local context. |
+| Hook drift is easy to miss. | `verify` checks hook registrations and protected-path behavior. |
+| Sensitive modules depend on memory. | Presets create local `CLAUDE.md` files for sensitive paths. |
+| CI cannot tell whether agent rules still work. | Deterministic lint, mutation, and smoke checks fail the build. |
+
+## Demo
+
+Run the built-in demos from a source checkout:
 
 ```bash
-python -m pip install -e ".[dev]"
+bash scripts/demo_generic.sh
+bash scripts/demo_enterprise_java_codeup.sh
+bash scripts/demo_bad_repo.sh
 ```
 
-## 选择 preset
+The main demo flow is:
 
-- `generic`：通用仓库，默认 `ConfigChange` 为 `block`，适合 GitHub Actions。
-- `java-maven`：Java/Maven 仓库，敏感目录匹配 payment/order/refund/consumer/migration，默认 `ConfigChange` 为 `warn`。
-- `enterprise-java-codeup`：面向 enterprise-java-codeup 类 Java/Maven + Codeup 仓库，默认 CI provider 为 `codeup`，行为用例为 `tests/ai_behavior_cases.enterprise-java-codeup.json`。
-- `auto`：根据 `pom.xml`、`package.json`、git remote 和目录名做保守推断；公开文档和 CI 中建议显式指定 preset。
+1. Copy a small fixture repo.
+2. Run `init` with the `generic` preset.
+3. Run `verify` and show governance checks passing.
+4. Switch to the bad fixture and show deterministic failure.
 
-enterprise-java-codeup / Codeup 示例：
+More details: [docs/demo.md](docs/demo.md).
+
+## Presets
+
+- `generic`: default policy for ordinary repositories; `ConfigChange` blocks by default.
+- `java-maven`: Java/Maven thresholds and sensitive path patterns; `ConfigChange` warns by default.
+- `enterprise-java-codeup`: Java/Maven + Codeup example preset with Codeup CI assets.
+- `auto`: conservative local detection; public docs and CI should prefer explicit presets.
+
+Codeup example:
 
 ```bash
 claude-md-governance init --repo <repo> --preset enterprise-java-codeup --ci codeup --config-change-mode warn --yes
 claude-md-governance verify --repo <repo>
 ```
 
-## 安装后验证
+## Verification
 
-确定性验证：
+Deterministic checks:
 
 ```bash
 claude-md-governance verify --repo .
 claude-md-governance lint --repo . --policy .claude-governance/policy.json --output .claude-governance/score.json
 ```
 
-可选 Claude CLI 行为测试：
+Optional Claude CLI behavior tests:
 
 ```bash
 claude-md-governance behavior-test --repo . --cases tests/ai_behavior_cases.json
 claude-md-governance verify --repo . --with-claude
 ```
 
-如果本机或 CI 没有登录 Claude CLI，可选测试会跳过；加 `--require-claude` 后会把缺失 Claude CLI 视为失败。
+If Claude CLI is unavailable or not logged in, optional behavior tests are
+reported as `SKIPPED`. Use `--require-claude` only when CI must fail on a missing
+Claude session.
 
-## CI 接入
+## Security Model
 
-GitHub Actions：
+- Hooks run repo-local allowlisted commands without shell chaining.
+- `PreToolUse` can block protected path edits before writes happen.
+- `PostToolUse` can report failures after tool actions, but it cannot undo writes.
+- `ConfigChange` can be configured as `block`, `warn`, or `off`.
+- The tool does not read secrets, send telemetry, or replace human code review.
 
-```bash
-claude-md-governance init --repo . --preset generic --ci github --yes
-```
+See [docs/security-model.md](docs/security-model.md).
 
-这会安装 `.github/workflows/claude-md-governance.yml`。工作流运行：
+## Contributing
 
-```bash
-python scripts/claude_md_lint.py --policy .claude-governance/policy.json --output .claude-governance/score.json
-python scripts/verify_claude_governance.py
-```
+Start with [CONTRIBUTING.md](CONTRIBUTING.md) and [GOVERNANCE.md](GOVERNANCE.md).
+Good first contributions include new presets, behavior cases, CI provider docs,
+demo fixtures, and governance rule requests.
 
-Codeup / 云效：
+## Docs
 
-```bash
-claude-md-governance init --repo . --preset enterprise-java-codeup --ci codeup --config-change-mode warn --yes
-```
+- [Getting Started](docs/en/getting-started.md) / [快速开始](docs/getting-started.md)
+- [Concepts](docs/en/concepts.md) / [概念](docs/concepts.md)
+- [Policy Reference](docs/en/policy-reference.md) / [规则参考](docs/policy-reference.md)
+- [Hooks Reference](docs/en/hooks-reference.md) / [Hooks 参考](docs/hooks-reference.md)
+- [GitHub CI](docs/en/ci-github.md) / [GitHub CI](docs/ci-github.md)
+- [Codeup CI](docs/en/ci-codeup.md) / [Codeup CI](docs/ci-codeup.md)
+- [Verification](docs/en/verification.md) / [验证](docs/verification.md)
+- [Behavior Tests](docs/en/behavior-tests.md) / [行为测试](docs/behavior-tests.md)
+- [Release Checklist](docs/release-checklist.md)
+- [Launch Plan](docs/launch-plan.md)
+- [Roadmap](ROADMAP.md)
 
-这会安装 `ci/codeup/claude-md-governance-step.yml` 和 `docs/ci/codeup-claude-md-governance.md`，把其中脚本加入 Codeup pipeline step。
+## 中文说明
 
-## 安全边界
-
-- `PreToolUse` 在写入前运行，可以阻止受保护路径编辑。
-- `PostToolUse` 在工具动作之后运行，可以 lint、报告失败并阻止后续流程，但不能撤销已经发生的写入。
-- `ConfigChange` 可按 policy 配置为 `block`、`warn` 或 `off`。
-- hook guard 只执行 allowlist 中的仓库本地命令，例如 `python scripts/...`、`mvn ...`、`npm run ...`。
-- 本项目不读取密钥，不替代代码审查，也不保证 LLM 会按规则行动；它提供可审计的结构和确定性门禁。
-
-## 贡献 preset、policy、rule
-
-贡献前请阅读 [CONTRIBUTING.md](CONTRIBUTING.md) 和 [GOVERNANCE.md](GOVERNANCE.md)。新增 preset 通常需要：
-
-- `src/claude_md_governance/data/templates/policies/<preset>.json`
-- `docs/presets/<preset>.md` 和 `docs/en/presets/<preset>.md`
-- 覆盖 init、lint、verify 或行为用例的测试
-- 示例仓库或 demo
-- README / reference 文档链接
-
-## 文档
-
-- [快速开始](docs/getting-started.md) / [Getting Started](docs/en/getting-started.md)
-- [概念](docs/concepts.md) / [Concepts](docs/en/concepts.md)
-- [Generic preset](docs/presets/generic.md) / [English](docs/en/presets/generic.md)
-- [Java Maven preset](docs/presets/java-maven.md) / [English](docs/en/presets/java-maven.md)
-- [enterprise-java-codeup preset](docs/presets/enterprise-java-codeup.md) / [English](docs/en/presets/enterprise-java-codeup.md)
-- [Policy Reference](docs/policy-reference.md) / [English](docs/en/policy-reference.md)
-- [Hooks Reference](docs/hooks-reference.md) / [English](docs/en/hooks-reference.md)
-- [GitHub CI](docs/ci-github.md) / [English](docs/en/ci-github.md)
-- [Codeup CI](docs/ci-codeup.md) / [English](docs/en/ci-codeup.md)
-- [Verification](docs/verification.md) / [English](docs/en/verification.md)
-- [Behavior Tests](docs/behavior-tests.md) / [English](docs/en/behavior-tests.md)
-- [Security Model](docs/security-model.md) / [English](docs/en/security-model.md)
-- [Architecture](docs/architecture.md) / [English](docs/en/architecture.md)
-- [Research Basis](docs/research-basis.md) / [English](docs/en/research-basis.md)
-- [FAQ](docs/faq.md) / [English](docs/en/faq.md)
+`claude-md-governance` 是一个 Python CLI，用 policy-as-code 管理 Claude Code
+项目的 `CLAUDE.md`、hook、CI 和验证报告。它会生成可审计的规则、保护敏感路径，
+并用确定性检查发现 `CLAUDE.md` 过长、规则空泛、hook 缺失或本地模块规则缺失等问题。

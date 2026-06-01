@@ -4,10 +4,21 @@
 
 ## Generic 快速开始
 
-输入：
+PyPI 包发布前，不要使用 `pip install claude-md-governance`。当前公开安装路径是
+GitHub Release wheel 或源码 checkout。
+
+源码 checkout：
 
 ```bash
-pip install claude-md-governance
+python -m pip install -e ".[test]"
+claude-md-governance init --repo . --preset generic --ci github --yes
+claude-md-governance verify --repo .
+```
+
+`v0.1.0` GitHub Release 发布后，wheel 安装路径是：
+
+```bash
+python -m pip install "https://github.com/lliangcol/claude-md-governance/releases/download/v0.1.0/claude_md_governance-0.1.0-py3-none-any.whl"
 claude-md-governance init --repo . --preset generic --ci github --yes
 claude-md-governance verify --repo .
 ```

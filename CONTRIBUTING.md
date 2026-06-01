@@ -13,12 +13,22 @@ Thanks for helping improve CLAUDE.md Governance.
 ## Development workflow
 
 ```bash
-python -m pip install -e .
+python -m pip install -e ".[test]"
 python -m pytest -q
 claude-md-governance doctor
 claude-md-governance init --repo /tmp/claude-gov-smoke --yes --preset generic --ci none
 claude-md-governance verify --repo /tmp/claude-gov-smoke
 ```
+
+## Starter Tasks
+
+Good first issues should stay small, verifiable, and useful to new users:
+
+- Add a preset request with target stack, sensitive paths, CI environment, and validation commands.
+- Add a behavior regression case to `tests/ai_behavior_cases*.json` with expected pass/fail signals.
+- Add CI provider documentation for a real provider without changing default install behavior.
+- Add a small demo fixture that proves one governance rule or failure mode.
+- Improve screenshots, release notes, README examples, or docs navigation.
 
 ## Rule requirements
 

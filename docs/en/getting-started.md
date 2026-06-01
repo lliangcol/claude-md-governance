@@ -4,10 +4,22 @@ Chinese version: [../getting-started.md](../getting-started.md)
 
 ## Generic quick start
 
-Input:
+Do not use `pip install claude-md-governance` until the PyPI package is live.
+The current public install path is the GitHub Release wheel or a source
+checkout.
+
+Source checkout:
 
 ```bash
-pip install claude-md-governance
+python -m pip install -e ".[test]"
+claude-md-governance init --repo . --preset generic --ci github --yes
+claude-md-governance verify --repo .
+```
+
+After the `v0.1.0` GitHub Release is published, the wheel install path is:
+
+```bash
+python -m pip install "https://github.com/lliangcol/claude-md-governance/releases/download/v0.1.0/claude_md_governance-0.1.0-py3-none-any.whl"
 claude-md-governance init --repo . --preset generic --ci github --yes
 claude-md-governance verify --repo .
 ```
