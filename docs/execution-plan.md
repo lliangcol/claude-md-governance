@@ -4,7 +4,7 @@ This document maps the generic v2 execution plan into open-source project assets
 
 Original source material was reviewed from private migration inputs and is not part of this repository:
 
-- Generic CLAUDE.md governance execution plan.
+- Generic AGENTS.md governance execution plan.
 - Starter kit archive.
 - Open-source prelaunch material archive.
 
@@ -25,8 +25,8 @@ The source plans are not runtime context. Maintained behavior lives in package c
 ## Generic Installation Flow
 
 ```bash
-claude-md-governance init --repo <repo> --preset generic --ci auto --yes
-claude-md-governance verify --repo <repo>
+codex-md-governance init --repo <repo> --preset generic --ci auto --yes
+codex-md-governance verify --repo <repo>
 ```
 
 The installer performs a conservative sequence:
@@ -35,8 +35,8 @@ The installer performs a conservative sequence:
 - Back up existing files before overwrite or merge.
 - Install common templates.
 - Write `.claude-governance/policy.json`.
-- Append missing root `CLAUDE.md` governance sections instead of replacing the file.
-- Generate local `CLAUDE.md` files only for detected sensitive directories.
+- Append missing root `AGENTS.md` governance sections instead of replacing the file.
+- Generate local `AGENTS.md` files only for detected sensitive directories.
 - Merge hooks into `.claude/settings.json`.
 - Install CI assets only for the selected provider.
 - Run verification unless skipped.
@@ -61,9 +61,9 @@ Supported CI modes:
 The intended unattended loop is:
 
 ```bash
-claude-md-governance lint --repo <repo> --output <repo>/.claude-governance/score.json
-claude-md-governance autofix --repo <repo> --apply
-claude-md-governance verify --repo <repo>
+codex-md-governance lint --repo <repo> --output <repo>/.claude-governance/score.json
+codex-md-governance autofix --repo <repo> --apply
+codex-md-governance verify --repo <repo>
 ```
 
 Autofix is intentionally limited. It may add missing sections, create local templates, and insert TODOs, but it must not invent business rules, banned dependencies, architecture history, or approval facts.
@@ -73,5 +73,5 @@ Autofix is intentionally limited. It may add missing sections, create local temp
 ```bash
 python -m pip install -e ".[test]"
 python -m pytest -q
-claude-md-governance --help
+codex-md-governance --help
 ```

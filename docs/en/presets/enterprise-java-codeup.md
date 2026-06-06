@@ -11,8 +11,8 @@ Chinese version: [../../presets/enterprise-java-codeup.md](../../presets/enterpr
 Input:
 
 ```bash
-claude-md-governance init --repo <repo> --preset enterprise-java-codeup --ci codeup --config-change-mode warn --yes
-claude-md-governance verify --repo <repo>
+codex-md-governance init --repo <repo> --preset enterprise-java-codeup --ci codeup --config-change-mode warn --yes
+codex-md-governance verify --repo <repo>
 ```
 
 Output:

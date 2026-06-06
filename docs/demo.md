@@ -46,14 +46,14 @@ video:
 
 ```bash
 python -m pip install -e ".[test]"
-claude-md-governance init --repo <tmp-repo> --preset generic --ci github --yes
-claude-md-governance verify --repo <tmp-repo>
+codex-md-governance init --repo <tmp-repo> --preset generic --ci github --yes
+codex-md-governance verify --repo <tmp-repo>
 python -m claude_md_governance lint --repo examples/bad-claude-md --quiet
 ```
 
 Expected highlights:
 
-- `init` installs `CLAUDE.md`, `.claude-governance/policy.json`,
+- `init` installs `AGENTS.md`, `.claude-governance/policy.json`,
   `.claude/settings.json`, local scripts, and GitHub Actions.
 - `verify` prints `Governance verification passed.` after checking hooks,
   static lint, ConfigChange behavior, and mutation failure detection.

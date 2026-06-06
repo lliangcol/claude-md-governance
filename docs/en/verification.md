@@ -7,16 +7,16 @@ Chinese version: [../verification.md](../verification.md)
 Input:
 
 ```bash
-claude-md-governance verify --repo .
+codex-md-governance verify --repo .
 ```
 
 Output:
 
 ```text
-PASS: required file exists: CLAUDE.md
+PASS: required file exists: AGENTS.md
 PASS: static linter passes
 PASS: PreToolUse blocks protected settings edit
-PASS: mutation test catches bad CLAUDE.md
+PASS: mutation test catches bad root instructions
 Governance verification passed.
 ```
 
@@ -43,7 +43,7 @@ Failure handling: use the failing test to locate CLI, installer, lint, or behavi
 Input:
 
 ```bash
-claude-md-governance verify --repo . --with-claude
+codex-md-governance verify --repo . --with-claude
 ```
 
 Output: shows `SKIPPED` if the `claude` command is unavailable.

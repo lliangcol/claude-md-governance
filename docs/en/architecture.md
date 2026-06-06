@@ -16,13 +16,13 @@ Chinese version: [../architecture.md](../architecture.md)
 
 1. `init` reads the target repository and selects preset, CI provider, and config mode.
 2. The installer copies templates, merges `.claude/settings.json`, and writes or merges policy.
-3. `lint` reads policy and `CLAUDE.md`, then writes a score report.
+3. `lint` reads policy and the root instruction file, then writes a score report.
 4. The hook guard reads the same policy during Claude Code events.
 5. CI runs lint and verify to keep the installation executable.
 
 ## Command consistency
 
-Public commands are exposed as `claude-md-governance <subcommand>`. Templates still use `python scripts/...` because installed target repositories may not have the package installed, but they do contain local scripts.
+Public commands are exposed as `codex-md-governance <subcommand>`; `claude-md-governance` remains as a compatibility alias. Templates still use `python scripts/...` because installed target repositories may not have the package installed, but they do contain local scripts.
 
 Failure handling:
 

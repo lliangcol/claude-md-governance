@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Static linter for CLAUDE.md governance.
+"""Static linter for repository instruction governance.
 
 Zero-dependency, repository-local, deterministic. Produces a JSON report and
 exits non-zero when hard failures exist or the score falls below threshold.
@@ -18,6 +18,18 @@ from typing import Any, Dict, Iterable, List, Tuple
 
 DEFAULT_POLICY_PATH = ".claude-governance/policy.json"
 SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "dist", "build", "target", ".idea", ".gradle"}
+DEPENDENCY_FILE_NAMES = {
+    "package.json",
+    "package-lock.json",
+    "pnpm-lock.yaml",
+    "yarn.lock",
+    "pom.xml",
+    "build.gradle",
+    "build.gradle.kts",
+    "requirements.txt",
+    "requirements-dev.txt",
+    "pyproject.toml",
+}
 
 
 def load_json(path: Path) -> Dict[str, Any]:
@@ -37,6 +49,29 @@ def display_path(repo: Path, path: Path) -> str:
         return f"<outside-repo>/{path.name}"
 
 
+def root_doc_policy(policy: Dict[str, Any]) -> Dict[str, Any]:
+    for key in ("root_doc", "root_agents", "root_claude"):
+        value = policy.get(key)
+        if isinstance(value, dict):
+            return value
+    return {}
+
+
+def root_doc_path(policy: Dict[str, Any]) -> str:
+    return str(root_doc_policy(policy).get("path", "CLAUDE.md"))
+
+
+def resolve_root_doc_path(repo: Path, policy: Dict[str, Any], explicit_path: str | None = None) -> Path:
+    rel = explicit_path or root_doc_path(policy)
+    if not explicit_path and rel == "CLAUDE.md" and not (repo / rel).exists() and (repo / "AGENTS.md").exists():
+        rel = "AGENTS.md"
+    return (repo / rel).resolve() if not Path(rel).is_absolute() else Path(rel)
+
+
+def root_doc_name(policy: Dict[str, Any]) -> str:
+    return Path(root_doc_path(policy)).name
+
+
 def estimate_tokens(text: str) -> int:
     # Approximation only: good enough for budget regression gates.
     ascii_words = len(re.findall(r"[A-Za-z0-9_]+", text))
@@ -53,6 +88,10 @@ def normalize(path: str) -> str:
 def line_number_for(text: str, needle: str) -> int:
     idx = text.lower().find(needle.lower())
     return 0 if idx < 0 else text[:idx].count("\n") + 1
+
+
+def line_number_at(text: str, index: int) -> int:
+    return 0 if index < 0 else text[:index].count("\n") + 1
 
 
 def section_names(spec: Any) -> List[str]:
@@ -78,14 +117,22 @@ def section_deduction(spec: Any) -> int:
 def has_section(text: str, names: Iterable[str]) -> bool:
     for name in names:
         escaped = re.escape(name)
-        # Accept numbered headings, e.g. "## 3. Core Engineering Rules".
+        # Accept numbered headings while keeping matches anchored to headings.
         patterns = [
-            rf"^\s*#+\s*(?:\d+(?:\.\d+)*\.?\s*)?{escaped}\b",
-            rf"^\s*#+\s*(?:\d+(?:\.\d+)*\.?\s*)?.*{escaped}.*$",
+            rf"^\s*#+\s*(?:\d+(?:\.\d+)*\.?\s*)?{escaped}\s*(?:\([^)]*\))?\s*(?:[:：\-].*)?$",
         ]
         if any(re.search(p, text, flags=re.I | re.M) for p in patterns):
             return True
     return False
+
+
+def phrase_hits(text: str, phrase: str) -> List[re.Match[str]]:
+    escaped = re.escape(phrase)
+    if re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_ ]*[A-Za-z0-9_]", phrase):
+        pattern = rf"(?<![A-Za-z0-9_]){escaped}(?![A-Za-z0-9_])"
+    else:
+        pattern = escaped
+    return list(re.finditer(pattern, text, flags=re.I))
 
 
 def find_imports(text: str) -> List[Tuple[int, str]]:
@@ -107,6 +154,18 @@ def walk_repo(repo: Path):
     for root, dirs, files in os.walk(repo):
         dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
         yield Path(root), dirs, files
+
+
+def dependency_mentions(repo: Path, dep: str) -> List[str]:
+    hits: List[str] = []
+    for root, dirs, files in walk_repo(repo):
+        for filename in files:
+            if filename not in DEPENDENCY_FILE_NAMES:
+                continue
+            path = Path(root) / filename
+            if phrase_hits(read_text(path), dep):
+                hits.append(display_path(repo, path))
+    return sorted(set(hits))
 
 
 def path_matches(candidate: str, pattern: str) -> bool:
@@ -153,13 +212,15 @@ def find_sensitive_dirs(repo: Path, item: Dict[str, Any]) -> List[str]:
         name = root.name.lower()
         if keywords and not any(k in name or k in rel.lower() for k in keywords):
             continue
-        if path_matches(rel, pattern) or (keywords and any(k in name for k in keywords)):
+        if path_matches(rel, pattern):
             results.append(rel)
     return sorted(set(results))
 
 
-def local_path_for(item: Dict[str, Any], matched_dir: str) -> str:
-    local = str(item.get("local_claude", ""))
+def local_path_for(item: Dict[str, Any], matched_dir: str, doc_name: str = "CLAUDE.md") -> str:
+    local = str(item.get("local_doc") or item.get("local_agents") or item.get("local_claude", ""))
+    if doc_name.upper() == "AGENTS.MD" and "local_agents" not in item and local.endswith("CLAUDE.md"):
+        local = local.removesuffix("CLAUDE.md") + "AGENTS.md"
     module = Path(matched_dir).name
     return local.replace("{dir}", matched_dir).replace("{module}", module)
 
@@ -196,12 +257,23 @@ def guard_command_matches(command: str, mode: str) -> bool:
     if not argv:
         return False
     exe = Path(argv[0]).name.lower()
+    def path_endswith(arg: str, suffix: str) -> bool:
+        normalized = arg.strip("\"'").replace("\\", "/")
+        return normalized == suffix or normalized.endswith("/" + suffix)
+
     if exe in {"python", "python.exe", "python3", "python3.exe", "py", "py.exe"}:
-        if len(argv) == 3 and argv[1] == "scripts/claude_hook_guard.py":
+        if len(argv) == 3 and path_endswith(argv[1], "scripts/claude_hook_guard.py"):
             return argv[2] == mode
         if len(argv) == 5 and argv[1] == "-m" and argv[2] in {"claude_md_governance.cli", "claude_md_governance"}:
             return argv[3] == "hook" and argv[4] == mode
         return False
+    if exe in {"node", "node.exe"}:
+        return (
+            len(argv) == 4
+            and path_endswith(argv[1], ".claude/hooks/run-python-hook.js")
+            and path_endswith(argv[2], "scripts/claude_hook_guard.py")
+            and argv[3] == mode
+        )
     return len(argv) == 3 and exe in {"claude-md-governance", "claude-md-governance.exe"} and argv[1] == "hook" and argv[2] == mode
 
 
@@ -223,16 +295,24 @@ def lint(repo: Path, policy: Dict[str, Any], claude_path: Path) -> Dict[str, Any
     hard_fail = False
     score = 100
     detected_sensitive_dirs: List[Dict[str, str]] = []
+    doc_name = root_doc_name(policy)
 
     text = read_text(claude_path)
     if not text:
-        add_finding(findings, rule="ROOT_MISSING", severity="error", message=f"Root CLAUDE.md not found: {display_path(repo, claude_path)}", deduction=40, suggestion="Create a concise root CLAUDE.md using the starter template.")
+        add_finding(
+            findings,
+            rule="ROOT_MISSING",
+            severity="error",
+            message=f"Root instruction file not found: {display_path(repo, claude_path)}",
+            deduction=40,
+            suggestion=f"Create a concise root {doc_name} using the starter template.",
+        )
         hard_fail = True
         score -= 40
     else:
         lines = len(text.splitlines())
         tokens = estimate_tokens(text)
-        root_policy = policy.get("root_claude", {})
+        root_policy = root_doc_policy(policy)
         warn_lines = int(root_policy.get("warn_lines", 160))
         max_lines = int(root_policy.get("max_lines", 200))
         hard_fail_lines = int(root_policy.get("hard_fail_lines", 220))
@@ -240,15 +320,15 @@ def lint(repo: Path, policy: Dict[str, Any], claude_path: Path) -> Dict[str, Any
         hard_fail_tokens = int(root_policy.get("hard_fail_tokens", 5000))
 
         if lines > hard_fail_lines:
-            add_finding(findings, rule="ROOT_TOO_LONG", severity="error", message=f"CLAUDE.md has {lines} lines; hard limit is {hard_fail_lines}.", deduction=18, suggestion="Move long procedures into docs or skills and keep root CLAUDE.md as a context map.")
+            add_finding(findings, rule="ROOT_TOO_LONG", severity="error", message=f"{doc_name} has {lines} lines; hard limit is {hard_fail_lines}.", deduction=18, suggestion=f"Move long procedures into docs or skills and keep root {doc_name} as a context map.")
             hard_fail = True
             score -= 18
         elif lines > max_lines:
-            add_finding(findings, rule="ROOT_TOO_LONG", severity="error", message=f"CLAUDE.md has {lines} lines; max is {max_lines}.", deduction=12, suggestion="Reduce to configured max_lines.")
+            add_finding(findings, rule="ROOT_TOO_LONG", severity="error", message=f"{doc_name} has {lines} lines; max is {max_lines}.", deduction=12, suggestion="Reduce to configured max_lines.")
             hard_fail = True
             score -= 12
         elif lines > warn_lines:
-            add_finding(findings, rule="ROOT_LINE_BUDGET", severity="warning", message=f"CLAUDE.md has {lines} lines; warning threshold is {warn_lines}.", deduction=5, suggestion="Trim non-global or long-form content.")
+            add_finding(findings, rule="ROOT_LINE_BUDGET", severity="warning", message=f"{doc_name} has {lines} lines; warning threshold is {warn_lines}.", deduction=5, suggestion="Trim non-global or long-form content.")
             score -= 5
 
         if tokens > hard_fail_tokens:
@@ -273,11 +353,10 @@ def lint(repo: Path, policy: Dict[str, Any], claude_path: Path) -> Dict[str, Any
         for phrases in policy.get("vague_phrases", {}).values():
             vague_phrases.extend([str(p) for p in phrases])
         vague_hits: List[Tuple[str, int, int]] = []
-        lower_text = text.lower()
         for phrase in vague_phrases:
-            count = lower_text.count(phrase.lower())
-            if count:
-                vague_hits.append((phrase, count, line_number_for(text, phrase)))
+            hits = phrase_hits(text, phrase)
+            if hits:
+                vague_hits.append((phrase, len(hits), line_number_at(text, hits[0].start())))
         total_vague = sum(c for _, c, _ in vague_hits)
         for phrase, count, line in vague_hits:
             deduction = min(2 * count, 4)
@@ -305,8 +384,21 @@ def lint(repo: Path, policy: Dict[str, Any], claude_path: Path) -> Dict[str, Any
                 hard_fail = True
 
         for dep in policy.get("banned_dependencies", []):
-            if str(dep).lower() not in lower_text:
-                add_finding(findings, rule="BANNED_DEP_NOT_DOCUMENTED", severity="warning", message=f"Policy bans '{dep}' but CLAUDE.md does not mention it.", deduction=3, suggestion="Add it under Do NOT introduce with a reason.")
+            dep_text = str(dep)
+            locations = dependency_mentions(repo, dep_text)
+            if locations:
+                add_finding(
+                    findings,
+                    rule="BANNED_DEP_PRESENT",
+                    severity="error",
+                    message=f"Policy-banned dependency '{dep_text}' appears in dependency files: {', '.join(locations[:5])}.",
+                    deduction=12,
+                    suggestion="Remove the dependency or change policy with explicit review.",
+                )
+                hard_fail = True
+                score -= 12
+            elif not phrase_hits(text, dep_text):
+                add_finding(findings, rule="BANNED_DEP_NOT_DOCUMENTED", severity="warning", message=f"Policy bans '{dep_text}' but {doc_name} does not mention it.", deduction=3, suggestion="Add it under Do NOT introduce with a reason.")
                 score -= 3
 
     for item in policy.get("sensitive_paths", []):
@@ -316,10 +408,10 @@ def lint(repo: Path, policy: Dict[str, Any], claude_path: Path) -> Dict[str, Any
             continue
         dirs = find_sensitive_dirs(repo, item)
         for d in dirs:
-            local_rel = local_path_for(item, d)
-            detected_sensitive_dirs.append({"id": str(item.get("id", "")), "dir": d, "local_claude": local_rel})
+            local_rel = local_path_for(item, d, doc_name)
+            detected_sensitive_dirs.append({"id": str(item.get("id", "")), "dir": d, "local_doc": local_rel})
             if not (repo / local_rel).exists():
-                add_finding(findings, rule="MISSING_LOCAL_CLAUDE", severity="error", message=f"Sensitive path exists but local CLAUDE.md is missing: {local_rel}", deduction=10, suggestion="Create local CLAUDE.md with safety boundaries and required checks.")
+                add_finding(findings, rule="MISSING_LOCAL_DOC", severity="error", message=f"Sensitive path exists but local instruction file is missing: {local_rel}", deduction=10, suggestion=f"Create local {Path(local_rel).name} with safety boundaries and required checks.")
                 hard_fail = True
                 score -= 10
 
@@ -365,6 +457,7 @@ def lint(repo: Path, policy: Dict[str, Any], claude_path: Path) -> Dict[str, Any
             "errors": sum(1 for f in findings if f["severity"] == "error"),
             "warnings": sum(1 for f in findings if f["severity"] == "warning"),
             "claude_path": display_path(repo, claude_path),
+            "root_doc_path": display_path(repo, claude_path),
             "line_count": len(text.splitlines()) if text else 0,
             "estimated_tokens": estimate_tokens(text) if text else 0,
             "detected_sensitive_dirs": detected_sensitive_dirs,
@@ -376,7 +469,8 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo", default=".")
     parser.add_argument("--policy", default=DEFAULT_POLICY_PATH)
-    parser.add_argument("--claude", default=None)
+    parser.add_argument("--root-doc", default=None, help="Root instruction file to lint, for example AGENTS.md or CLAUDE.md.")
+    parser.add_argument("--claude", default=None, help="Legacy alias for --root-doc.")
     parser.add_argument("--output", default=None)
     parser.add_argument("--fail-under", type=int, default=None)
     parser.add_argument("--quiet", action="store_true")
@@ -387,8 +481,7 @@ def main() -> int:
     policy = load_json(policy_path)
     if args.fail_under is not None:
         policy["score_threshold"] = args.fail_under
-    claude_rel = args.claude or policy.get("root_claude", {}).get("path", "CLAUDE.md")
-    claude_path = (repo / claude_rel).resolve() if not Path(claude_rel).is_absolute() else Path(claude_rel)
+    claude_path = resolve_root_doc_path(repo, policy, args.root_doc or args.claude)
 
     report = lint(repo, policy, claude_path)
     report_json = json.dumps(report, ensure_ascii=False, indent=2)

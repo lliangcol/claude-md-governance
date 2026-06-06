@@ -1,6 +1,6 @@
 # Example Yunxiao / Codeup pipeline step. Adapt in the Aliyun UI.
 steps:
-  - name: CLAUDE.md Governance
+  - name: AGENTS.md Governance
     script: |
       python scripts/claude_md_lint.py \
         --policy .claude-governance/policy.json \

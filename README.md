@@ -1,8 +1,8 @@
-# CLAUDE.md Governance
+# AGENTS.md Governance
 
-Keep `CLAUDE.md` short. Make rules enforceable. Stop context drift.
+Keep `AGENTS.md` short. Make rules enforceable. Stop context drift.
 
-Make Claude Code repo rules enforceable with policy-as-code, hooks, and CI.
+Make Codex and Claude Code repo rules enforceable with policy-as-code, hooks, and CI.
 
 [![CI](https://github.com/lliangcol/claude-md-governance/actions/workflows/ci.yml/badge.svg)](https://github.com/lliangcol/claude-md-governance/actions/workflows/ci.yml)
 [![Governance](https://github.com/lliangcol/claude-md-governance/actions/workflows/claude-md-governance.yml/badge.svg)](https://github.com/lliangcol/claude-md-governance/actions/workflows/claude-md-governance.yml)
@@ -10,7 +10,7 @@ Make Claude Code repo rules enforceable with policy-as-code, hooks, and CI.
 [![Python](https://img.shields.io/badge/python-3.10%2B-3776ab)](pyproject.toml)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-![CLAUDE.md governance demo](docs/assets/demo-governance-flow.gif)
+![AGENTS.md governance demo](docs/assets/demo-governance-flow.gif)
 
 ## Quickstart
 
@@ -20,42 +20,44 @@ claude-md-governance` until that package is live.
 
 ```bash
 python -m pip install -e ".[test]"
-claude-md-governance init --repo <your-repo> --preset generic --ci github --yes
-claude-md-governance verify --repo <your-repo>
+codex-md-governance init --repo <your-repo> --preset generic --ci github --yes
+codex-md-governance verify --repo <your-repo>
 ```
+
+`claude-md-governance` remains available as a legacy command alias.
 
 After `v0.1.0` is published on GitHub Releases, the wheel install path is:
 
 ```bash
 python -m pip install "https://github.com/lliangcol/claude-md-governance/releases/download/v0.1.0/claude_md_governance-0.1.0-py3-none-any.whl"
-claude-md-governance init --repo <your-repo> --preset generic --ci github --yes
-claude-md-governance verify --repo <your-repo>
+codex-md-governance init --repo <your-repo> --preset generic --ci github --yes
+codex-md-governance verify --repo <your-repo>
 ```
 
 Expected success output includes:
 
 ```text
-Installed CLAUDE.md governance into <repo>
+Installed AGENTS.md governance into <repo>
 Preset: generic; CI provider: github; ConfigChange mode: block
 Governance verification passed.
 ```
 
 ## What It Does
 
-- Installs a short root `CLAUDE.md` with enforceable repo rules.
+- Installs a short root `AGENTS.md` with enforceable repo rules.
 - Adds versioned policy files under `.claude-governance/`.
-- Registers Claude Code `PreToolUse`, `PostToolUse`, and `ConfigChange` hooks.
+- Registers repository hook definitions for deterministic guardrails.
 - Runs deterministic lint and verify checks locally and in CI.
 - Creates local module rules for sensitive paths when a preset detects them.
 
-## Why Not Just Write A Bigger `CLAUDE.md`?
+## Why Not Just Write A Bigger `AGENTS.md`?
 
-| Bigger `CLAUDE.md` | CLAUDE.md Governance |
+| Bigger `AGENTS.md` | AGENTS.md Governance |
 | --- | --- |
 | Rules are only context. | Rules become policy, hooks, and CI checks. |
 | Context grows until it is hard to scan. | Root instructions stay short and link to focused local context. |
 | Hook drift is easy to miss. | `verify` checks hook registrations and protected-path behavior. |
-| Sensitive modules depend on memory. | Presets create local `CLAUDE.md` files for sensitive paths. |
+| Sensitive modules depend on memory. | Presets create local `AGENTS.md` files for sensitive paths. |
 | CI cannot tell whether agent rules still work. | Deterministic lint, mutation, and smoke checks fail the build. |
 
 ## Demo
@@ -87,8 +89,8 @@ More details: [docs/demo.md](docs/demo.md).
 Codeup example:
 
 ```bash
-claude-md-governance init --repo <repo> --preset enterprise-java-codeup --ci codeup --config-change-mode warn --yes
-claude-md-governance verify --repo <repo>
+codex-md-governance init --repo <repo> --preset enterprise-java-codeup --ci codeup --config-change-mode warn --yes
+codex-md-governance verify --repo <repo>
 ```
 
 ## Verification
@@ -96,15 +98,15 @@ claude-md-governance verify --repo <repo>
 Deterministic checks:
 
 ```bash
-claude-md-governance verify --repo .
-claude-md-governance lint --repo . --policy .claude-governance/policy.json --output .claude-governance/score.json
+codex-md-governance verify --repo .
+codex-md-governance lint --repo . --policy .claude-governance/policy.json --output .claude-governance/score.json
 ```
 
 Optional Claude CLI behavior tests:
 
 ```bash
-claude-md-governance behavior-test --repo . --cases tests/ai_behavior_cases.json
-claude-md-governance verify --repo . --with-claude
+codex-md-governance behavior-test --repo . --cases tests/ai_behavior_cases.json
+codex-md-governance verify --repo . --with-claude
 ```
 
 If Claude CLI is unavailable or not logged in, optional behavior tests are
@@ -143,6 +145,7 @@ demo fixtures, and governance rule requests.
 
 ## 中文说明
 
-`claude-md-governance` 是一个 Python CLI，用 policy-as-code 管理 Claude Code
-项目的 `CLAUDE.md`、hook、CI 和验证报告。它会生成可审计的规则、保护敏感路径，
-并用确定性检查发现 `CLAUDE.md` 过长、规则空泛、hook 缺失或本地模块规则缺失等问题。
+`codex-md-governance` 是一个 Python CLI，用 policy-as-code 管理 Codex
+项目的 `AGENTS.md`、hook、CI 和验证报告。`claude-md-governance` 仍是兼容 alias。
+它会生成可审计的规则、保护敏感路径，并用确定性检查发现 root 指令过长、规则空泛、
+hook 缺失或本地模块规则缺失等问题。

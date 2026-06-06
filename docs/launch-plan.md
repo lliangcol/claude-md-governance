@@ -23,8 +23,8 @@ not feature expansion.
 | --- | --- | --- | --- |
 | 1 | Repository conversion | README, release, demo, topics, social preview | Try the demo in 3 minutes |
 | 2 | First announcement | X thread, Dev.to tutorial, Chinese long-form post | Run it on a repo |
-| 3 | Failure proof | Bad repo interception demo | Share a broken CLAUDE.md case |
-| 4 | Positioning | "Why CLAUDE.md alone is not enough" comparison | Request a rule |
+| 3 | Failure proof | Bad repo interception demo | Share a broken AGENTS.md case |
+| 4 | Positioning | "Why AGENTS.md alone is not enough" comparison | Request a rule |
 | 5 | Case study | Real or anonymized adoption story | Request a preset |
 | 6 | Follow-up release | `v0.1.x` changelog and feedback recap | Upgrade and report gaps |
 
@@ -33,9 +33,9 @@ not feature expansion.
 ```text
 I built a small Python CLI that turns Claude Code repo rules into something enforceable.
 
-`CLAUDE.md` is useful, but it is still context.
+`AGENTS.md` is useful, but it is still context.
 
-CLAUDE.md Governance installs:
+AGENTS.md Governance installs:
 - short root instructions
 - versioned policy files
 - Claude Code hooks

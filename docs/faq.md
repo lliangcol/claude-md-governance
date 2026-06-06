@@ -2,7 +2,7 @@
 
 对应英文版：[docs/en/faq.md](en/faq.md)
 
-## 这个项目会替我写 CLAUDE.md 吗？
+## 这个项目会替我写 AGENTS.md 吗？
 
 `init` 会生成骨架并补齐缺失章节，但内容仍需要仓库维护者填入真实架构、禁用依赖和敏感边界。
 
@@ -15,16 +15,16 @@
 可以。使用：
 
 ```bash
-claude-md-governance init --repo . --preset generic --ci none --yes
+codex-md-governance init --repo . --preset generic --ci none --yes
 ```
 
 输出：不生成 GitHub 或 Codeup CI 文件。
-失败处理：仍建议本地运行 `claude-md-governance verify --repo .`。
+失败处理：仍建议本地运行 `codex-md-governance verify --repo .`。
 
 ## 如何只生成 Codeup 示例？
 
 ```bash
-claude-md-governance init --repo . --preset enterprise-java-codeup --ci codeup --config-change-mode warn --yes
+codex-md-governance init --repo . --preset enterprise-java-codeup --ci codeup --config-change-mode warn --yes
 ```
 
 失败处理：如果已有文件未覆盖，加 `--force`。
@@ -34,7 +34,7 @@ claude-md-governance init --repo . --preset enterprise-java-codeup --ci codeup -
 默认缺少 Claude CLI 时跳过。需要强制执行：
 
 ```bash
-claude-md-governance behavior-test --repo . --require-claude
+codex-md-governance behavior-test --repo . --require-claude
 ```
 
 失败处理：安装并登录 Claude CLI，或移除 `--require-claude`。
@@ -45,5 +45,5 @@ claude-md-governance behavior-test --repo . --require-claude
 
 ```bash
 python -m pytest -q
-claude-md-governance verify --repo .
+codex-md-governance verify --repo .
 ```

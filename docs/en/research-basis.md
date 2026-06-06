@@ -17,7 +17,7 @@ The project is based on engineering governance principles. It does not claim tha
 Input:
 
 ```bash
-claude-md-governance verify --repo .
+codex-md-governance verify --repo .
 python -m pytest -q
 ```
 

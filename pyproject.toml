@@ -1,14 +1,14 @@
 [project]
 name = "claude-md-governance"
 version = "0.1.0"
-description = "Policy-as-code governance starter kit for CLAUDE.md quality"
+description = "Policy-as-code governance starter kit for AGENTS.md and CLAUDE.md quality"
 requires-python = ">=3.10"
 dependencies = []
 license = "MIT"
 license-files = ["LICENSE"]
 readme = "README.md"
 authors = [{name = "claude-md-governance maintainers"}]
-keywords = ["claude", "claude-code", "governance", "cli", "policy-as-code"]
+keywords = ["codex", "agents-md", "claude", "claude-code", "governance", "cli", "policy-as-code"]
 
 [project.optional-dependencies]
 test = ["pytest>=8"]
@@ -16,6 +16,7 @@ build = ["build>=1", "twine>=5"]
 dev = ["pytest>=8", "build>=1", "twine>=5"]
 
 [project.scripts]
+codex-md-governance = "claude_md_governance.cli:main"
 claude-md-governance = "claude_md_governance.cli:main"
 
 [tool.setuptools.packages.find]
@@ -27,7 +28,9 @@ claude_md_governance = [
   "data/templates/**/*.md",
   "data/templates/**/*.py",
   "data/templates/**/*.yml",
+  "data/templates/common/.agents/skills/claude-md-governance/SKILL.md",
   "data/templates/common/.claude/skills/claude-md-governance/SKILL.md",
+  "data/templates/common/.codex/hooks.json",
 ]
 
 [build-system]

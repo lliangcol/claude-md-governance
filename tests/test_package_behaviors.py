@@ -44,6 +44,8 @@ def test_template_resources_exist() -> None:
     assert (root / "policies" / "java-maven.json").exists()
     assert (root / "policies" / "enterprise-java-codeup.json").exists()
     assert (root / "common" / "scripts" / "claude_md_lint.py").exists()
+    assert (root / "common" / ".agents" / "skills" / "claude-md-governance" / "SKILL.md").exists()
+    assert (root / "common" / ".codex" / "hooks.json").exists()
     assert (root / "common" / ".claude" / "skills" / "claude-md-governance" / "SKILL.md").exists()
     assert (root / "github" / "workflows" / "claude-md-governance.yml").exists()
     assert not (root / "github" / ".github" / "workflows" / "claude-md-governance.yml").exists()
@@ -54,6 +56,9 @@ def test_init_copies_skill_and_filters_template_cache(tmp_path: Path) -> None:
     repo = make_repo(tmp_path, "skill-template")
     proc = run_cli("init", "--repo", str(repo), "--preset", "generic", "--ci", "none", "--yes", "--skip-verify")
     assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert (repo / "AGENTS.md").exists()
+    assert (repo / ".agents" / "skills" / "claude-md-governance" / "SKILL.md").exists()
+    assert (repo / ".codex" / "hooks.json").exists()
     assert (repo / ".claude" / "skills" / "claude-md-governance" / "SKILL.md").exists()
     assert_no_python_cache_files(repo)
 
@@ -84,12 +89,40 @@ def test_import_too_long_fails(tmp_path: Path) -> None:
         ),
         encoding="utf-8",
     )
-    (repo / "CLAUDE.md").write_text(
+    (repo / "AGENTS.md").write_text(
         "# Project Overview\n\nx\n# Tech Stack\n\nx\n# Do NOT introduce\n\nx\n# Code Rules\n\nx\n# Context Map\n\n@docs/long.md\n# Quality Gates\n\nx\n# Working Style\n\nx\n",
         encoding="utf-8",
     )
     proc = run_cli("lint", "--repo", str(repo), "--quiet")
     assert proc.returncode == 1
+
+
+def test_banned_dependency_present_in_dependency_file_fails(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path, "banned-dep")
+    assert run_cli("init", "--repo", str(repo), "--preset", "generic", "--ci", "none", "--yes").returncode == 0
+    policy = json.loads((repo / ".claude-governance" / "policy.json").read_text(encoding="utf-8"))
+    policy["banned_dependencies"] = ["left-pad"]
+    (repo / ".claude-governance" / "policy.json").write_text(json.dumps(policy), encoding="utf-8")
+    (repo / "package.json").write_text(json.dumps({"dependencies": {"left-pad": "1.3.0"}}), encoding="utf-8")
+
+    proc = run_cli("lint", "--repo", str(repo), "--quiet")
+    assert proc.returncode == 1
+
+
+def test_sensitive_keywords_do_not_create_false_positive_without_path_match(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path, "sensitive-keywords")
+    policy = json.loads(policy_path("generic").read_text(encoding="utf-8"))
+    policy["sensitive_paths"] = [
+        {
+            "id": "payment",
+            "path": "src/payments/**",
+            "detect_keywords": ["payment"],
+            "local_agents": "src/payments/AGENTS.md",
+            "protected": True,
+        }
+    ]
+    (repo / "docs" / "payment-notes").mkdir(parents=True)
+    assert lint.find_sensitive_dirs(repo, policy["sensitive_paths"][0]) == []
 
 
 def test_lint_requires_hook_matcher_coverage_for_all_edit_tools(tmp_path: Path) -> None:
@@ -131,17 +164,17 @@ def test_autofix_repairs_current_repo_without_score_file(tmp_path: Path) -> None
     (repo / "src" / "auth").mkdir(parents=True)
     (repo / "docs").mkdir(exist_ok=True)
     (repo / "docs" / "long.md").write_text("\n".join(f"line {i}" for i in range(45)), encoding="utf-8")
-    (repo / "CLAUDE.md").write_text("# Project Overview\n\n@docs/long.md\n", encoding="utf-8")
+    (repo / "AGENTS.md").write_text("# Project Overview\n\n@docs/long.md\n", encoding="utf-8")
     (repo / ".claude" / "settings.json").write_text(json.dumps({"hooks": {}}), encoding="utf-8")
 
     dry = run_cli("autofix", "--repo", str(repo), "--dry-run")
     assert dry.returncode == 0, dry.stdout + dry.stderr
-    assert not (repo / "src" / "auth" / "CLAUDE.md").exists()
+    assert not (repo / "src" / "auth" / "AGENTS.md").exists()
 
     applied = run_cli("autofix", "--repo", str(repo), "--apply")
     assert applied.returncode == 0, applied.stdout + applied.stderr
-    assert (repo / "src" / "auth" / "CLAUDE.md").exists()
-    assert "@docs/long.md" not in (repo / "CLAUDE.md").read_text(encoding="utf-8")
+    assert (repo / "src" / "auth" / "AGENTS.md").exists()
+    assert "@docs/long.md" not in (repo / "AGENTS.md").read_text(encoding="utf-8")
     settings = json.loads((repo / ".claude" / "settings.json").read_text(encoding="utf-8"))
     assert "PreToolUse" in settings["hooks"]
     assert "PostToolUse" in settings["hooks"]
@@ -188,7 +221,7 @@ def test_pre_hook_blocks_and_allows_protected_path(tmp_path: Path) -> None:
     blocked = run_cli("hook", "pre", cwd=repo, input_text=event)
     assert blocked.returncode == 2
     env = os.environ.copy()
-    env["ALLOW_PROTECTED_EDIT"] = "1"
+    env["CLAUDE_GOVERNANCE_APPROVED_PATHS"] = ".claude/settings.json"
     allowed = run_cli("hook", "pre", cwd=repo, input_text=event, env=env)
     assert allowed.returncode == 0
     open_path = run_cli("hook", "pre", cwd=repo, input_text=json.dumps({"tool_input": {"file_path": "README.md"}}))
@@ -198,7 +231,7 @@ def test_pre_hook_blocks_and_allows_protected_path(tmp_path: Path) -> None:
 def test_post_hook_message_does_not_claim_rollback(tmp_path: Path) -> None:
     repo = make_repo(tmp_path, "post")
     assert run_cli("init", "--repo", str(repo), "--preset", "generic", "--ci", "none", "--yes").returncode == 0
-    post = run_cli("hook", "post", cwd=repo, input_text=json.dumps({"tool_input": {"file_path": "CLAUDE.md"}}))
+    post = run_cli("hook", "post", cwd=repo, input_text=json.dumps({"tool_input": {"file_path": "AGENTS.md"}}))
     assert "rollback" not in (post.stdout + post.stderr).lower()
 
 
@@ -224,6 +257,6 @@ def test_java_maven_preset_thresholds(tmp_path: Path) -> None:
 def test_bad_claude_md_fails(tmp_path: Path) -> None:
     repo = make_repo(tmp_path, "bad")
     assert run_cli("init", "--repo", str(repo), "--preset", "generic", "--ci", "none", "--yes").returncode == 0
-    (repo / "CLAUDE.md").write_text(("# Project Overview\n\n保持简洁。高质量。注重性能。\n") * 80, encoding="utf-8")
+    (repo / "AGENTS.md").write_text(("# Project Overview\n\n保持简洁。高质量。注重性能。\n") * 80, encoding="utf-8")
     proc = run_cli("lint", "--repo", str(repo), "--quiet")
     assert proc.returncode == 1

@@ -6,6 +6,8 @@ Runtime installation copies only the assets selected by preset and CI provider.
 
 ## Common Templates
 
+- `common/.agents/skills/claude-md-governance/SKILL.md`
+- `common/.codex/hooks.json`
 - `common/.claude/skills/claude-md-governance/SKILL.md`
 - `common/scripts/*.py`
 - `common/tests/ai_behavior_cases*.json`

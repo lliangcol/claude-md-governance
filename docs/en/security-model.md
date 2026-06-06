@@ -5,8 +5,8 @@ Chinese version: [../security-model.md](../security-model.md)
 ## Goals
 
 - Prevent silent edits to protected governance files.
-- Ensure sensitive business directories have local `CLAUDE.md` files.
-- Detect long root context, vague rules, and missing hooks in CI.
+- Ensure sensitive business directories have local `AGENTS.md`/`CLAUDE.md` files.
+- Detect long root instructions, vague rules, and missing hooks in CI.
 - Block or warn on Claude Code configuration changes.
 
 ## Non-goals
@@ -41,4 +41,16 @@ The hook guard parses command arguments and executes them without a shell. Polic
 - `yarn test`
 - `yarn run ...`
 
+Each policy command has a default 300-second timeout. Override it with `CLAUDE_GOVERNANCE_COMMAND_TIMEOUT_SECONDS`.
+
 Failure handling: if a policy command is skipped, change it to an allowlisted prefix or run it separately in CI.
+
+## Protected path approval
+
+If a protected edit is explicitly approved, scope the approval to the path:
+
+```powershell
+$env:CLAUDE_GOVERNANCE_APPROVED_PATHS = ".claude/settings.json"
+```
+
+The value matches only the approved path or glob. Do not use a global bypass.

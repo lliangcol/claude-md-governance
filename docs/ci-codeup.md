@@ -7,7 +7,7 @@
 输入：
 
 ```bash
-claude-md-governance init --repo . --preset enterprise-java-codeup --ci codeup --config-change-mode warn --yes
+codex-md-governance init --repo . --preset enterprise-java-codeup --ci codeup --config-change-mode warn --yes
 ```
 
 输出：
@@ -38,8 +38,12 @@ python scripts/verify_claude_governance.py
 
 ## 推荐触发路径
 
+- `AGENTS.md`
+- `**/AGENTS.md`
 - `CLAUDE.md`
 - `**/CLAUDE.md`
+- `.agents/**`
+- `.codex/**`
 - `.claude/**`
 - `.claude-governance/**`
 - `scripts/claude_*`

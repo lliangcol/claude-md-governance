@@ -2,7 +2,7 @@
 
 ## Mission
 
-Help teams turn CLAUDE.md best practices into enforceable repository governance.
+Help teams turn AGENTS.md best practices into enforceable repository governance.
 
 ## Non-goals
 
@@ -15,6 +15,6 @@ Help teams turn CLAUDE.md best practices into enforceable repository governance.
 
 - Installation completes without manual questions.
 - `verify_claude_governance.py` passes on supported presets.
-- Root CLAUDE.md remains under configured budget.
+- Root AGENTS.md remains under configured budget.
 - Protected path edits are blocked unless explicitly approved.
 - Generated TODOs are clear and reviewable.

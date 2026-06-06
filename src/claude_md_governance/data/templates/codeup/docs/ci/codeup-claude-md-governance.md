@@ -1,4 +1,4 @@
-# Aliyun Codeup / 云效 CLAUDE.md Governance Step
+# Aliyun Codeup / 云效 AGENTS.md Governance Step
 
 This repository is configured for a non-GitHub CI provider. Add the following shell commands to a 云效 / Codeup pipeline step that runs on merge requests touching governance files:
 
@@ -11,8 +11,12 @@ python scripts/verify_claude_governance.py
 
 Recommended trigger paths:
 
+- `AGENTS.md`
+- `**/AGENTS.md`
 - `CLAUDE.md`
 - `**/CLAUDE.md`
+- `.agents/**`
+- `.codex/**`
 - `.claude/**`
 - `.claude-governance/**`
 - `scripts/claude_*`

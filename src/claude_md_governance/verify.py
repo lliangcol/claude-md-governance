@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Automated smoke tests for CLAUDE.md governance installation."""
+"""Automated smoke tests for repository instruction governance installation."""
 from __future__ import annotations
 
 import argparse
@@ -50,6 +50,14 @@ def config_change_mode(policy: Dict) -> str:
     return "block"
 
 
+def root_doc_path(policy: Dict) -> str:
+    for key in ("root_doc", "root_agents", "root_claude"):
+        value = policy.get(key)
+        if isinstance(value, dict) and value.get("path"):
+            return str(value["path"])
+    return "CLAUDE.md"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo", default=".")
@@ -60,9 +68,10 @@ def main() -> int:
     repo = Path(args.repo).resolve()
     os.chdir(repo)
     failures: List[str] = []
+    policy = load_policy()
 
     required = [
-        "CLAUDE.md",
+        root_doc_path(policy),
         ".claude/settings.json",
         ".claude-governance/policy.json",
         "scripts/claude_md_lint.py",
@@ -70,8 +79,6 @@ def main() -> int:
     ]
     for rel in required:
         assert_true(Path(rel).exists(), f"required file exists: {rel}", failures)
-
-    policy = load_policy()
 
     ci_provider = policy.get("ci", {}).get("provider", "none")
     if ci_provider == "github":
@@ -90,7 +97,7 @@ def main() -> int:
     assert_true(proc.returncode == 2, "PreToolUse blocks protected settings edit", failures)
 
     env = os.environ.copy()
-    env["ALLOW_PROTECTED_EDIT"] = "1"
+    env["CLAUDE_GOVERNANCE_APPROVED_PATHS"] = ".claude/settings.json"
     proc_allowed = run([sys.executable, "scripts/claude_hook_guard.py", "pre"], input_text=protected_event, env=env)
     assert_true(proc_allowed.returncode == 0, "PreToolUse allows protected edit when explicitly approved", failures)
 
@@ -109,12 +116,12 @@ def main() -> int:
     else:
         assert_true(cfg_proc.returncode == 0, f"ConfigChange is {cfg_mode} (non-blocking)", failures)
 
-    with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix="_CLAUDE.md", delete=False) as f:
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix="_instructions.md", delete=False) as f:
         f.write(("# Project Overview\n\n保持简洁。高质量。注重性能。\n") * 80)
         bad_path = f.name
     try:
-        bad = run([sys.executable, "scripts/claude_md_lint.py", "--policy", ".claude-governance/policy.json", "--claude", bad_path, "--fail-under", "75", "--quiet"])
-        assert_true(bad.returncode != 0, "mutation test catches bad CLAUDE.md", failures)
+        bad = run([sys.executable, "scripts/claude_md_lint.py", "--policy", ".claude-governance/policy.json", "--root-doc", bad_path, "--fail-under", "75", "--quiet"])
+        assert_true(bad.returncode != 0, "mutation test catches bad root instructions", failures)
     finally:
         Path(bad_path).unlink(missing_ok=True)
 

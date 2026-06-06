@@ -22,4 +22,4 @@ Check:
 
 ## Reviewing preset changes
 
-Run an install test for that preset and inspect generated CLAUDE.md content for fabricated facts.
+Run an install test for that preset and inspect generated AGENTS.md content for fabricated facts.

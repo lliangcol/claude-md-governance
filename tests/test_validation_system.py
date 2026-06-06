@@ -6,7 +6,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from claude_md_governance import behavior, hook_guard, installer, lint, verify
+from claude_md_governance import autofix, behavior, hook_guard, installer, lint, verify
 from claude_md_governance.templates import policy_path
 
 
@@ -46,6 +46,10 @@ def test_cli_init_defaults_are_honored_by_wrapper(tmp_path: Path) -> None:
     repo = make_repo(tmp_path, "enterprise-java-codeup-name-should-not-change-cli-default")
     (repo / "pom.xml").write_text("<project></project>", encoding="utf-8")
     proc = run_cli("init", "--repo", str(repo))
+    assert proc.returncode == 2
+    assert "Use --yes for non-interactive installation." in proc.stderr
+
+    proc = run_cli("init", "--repo", str(repo), "--yes")
     assert proc.returncode == 0, proc.stdout + proc.stderr
     policy = json.loads((repo / ".claude-governance" / "policy.json").read_text(encoding="utf-8"))
     assert policy["preset"] == "generic"
@@ -64,19 +68,19 @@ def test_line_token_vague_import_and_section_rules(tmp_path: Path) -> None:
     assert install(repo).returncode == 0
     (repo / "docs").mkdir(exist_ok=True)
     (repo / "docs" / "long.md").write_text("\n".join(f"line {i}" for i in range(41)), encoding="utf-8")
-    (repo / "CLAUDE.md").write_text(
+    (repo / "AGENTS.md").write_text(
         "# Overview\n\nclean code simple robust high quality maintainable elegant performant\n\n@docs/long.md\n",
         encoding="utf-8",
     )
     policy = json.loads((repo / ".claude-governance" / "policy.json").read_text(encoding="utf-8"))
-    report = lint.lint(repo, policy, repo / "CLAUDE.md")
+    report = lint.lint(repo, policy, repo / "AGENTS.md")
     rules = {finding["rule"] for finding in report["findings"]}
     assert report["status"] == "fail"
     assert "MISSING_SECTION" in rules
     assert "TOO_MANY_VAGUE_RULES" in rules
     assert "IMPORT_TOO_LONG" in rules
-    assert report["summary"]["claude_path"] == "CLAUDE.md"
-    assert report["summary"]["line_count"] == len((repo / "CLAUDE.md").read_text(encoding="utf-8").splitlines())
+    assert report["summary"]["root_doc_path"] == "AGENTS.md"
+    assert report["summary"]["line_count"] == len((repo / "AGENTS.md").read_text(encoding="utf-8").splitlines())
     assert report["summary"]["estimated_tokens"] > 0
 
 
@@ -96,12 +100,12 @@ def test_settings_merge_path_normalization_and_sensitive_scan(tmp_path: Path) ->
     assert "echo keep" in commands
     assert lint.normalize(r".\src\auth\service.py") == "src/auth/service.py"
     assert hook_guard.event_path({"tool_input": {"file_path": r".\src\auth\service.py"}}) == "src/auth/service.py"
-    assert (repo / "src" / "auth" / "CLAUDE.md").exists()
+    assert (repo / "src" / "auth" / "AGENTS.md").exists()
 
 
 def test_init_appends_required_sections_only_when_headings_exist(tmp_path: Path) -> None:
     repo = make_repo(tmp_path, "body-mentions")
-    (repo / "CLAUDE.md").write_text(
+    (repo / "AGENTS.md").write_text(
         "# Notes\n\n"
         "This paragraph mentions Project Overview, Tech Stack, Do NOT introduce, Code Rules, "
         "Context Map, Quality Gates, and Working Style, but none of them are headings.\n",
@@ -109,7 +113,7 @@ def test_init_appends_required_sections_only_when_headings_exist(tmp_path: Path)
     )
     proc = install(repo)
     assert proc.returncode == 0, proc.stdout + proc.stderr
-    text = (repo / "CLAUDE.md").read_text(encoding="utf-8")
+    text = (repo / "AGENTS.md").read_text(encoding="utf-8")
     for heading in ["Project Overview", "Tech Stack", "Do NOT introduce", "Code Rules", "Context Map", "Quality Gates", "Working Style"]:
         assert f"# {heading}" in text
 
@@ -135,7 +139,7 @@ def test_integration_sample_repositories(tmp_path: Path) -> None:
         assert run_cli("verify", "--repo", str(repo)).returncode == 0
 
     bad = make_repo(tmp_path, "bad-repo-with-vague-claude-md")
-    (bad / "CLAUDE.md").write_text(("# Project Overview\n\nclean code simple robust high quality maintainable elegant performant\n") * 20, encoding="utf-8")
+    (bad / "AGENTS.md").write_text(("# Project Overview\n\nclean code simple robust high quality maintainable elegant performant\n") * 20, encoding="utf-8")
     init_bad = install(bad)
     assert init_bad.returncode == 1
     assert run_cli("lint", "--repo", str(bad), "--quiet").returncode == 1
@@ -149,7 +153,7 @@ def test_hook_behavior_matrix(tmp_path: Path) -> None:
     assert run_cli("hook", "pre", cwd=repo, input_text=protected).returncode == 2
 
     env = os.environ.copy()
-    env["ALLOW_PROTECTED_EDIT"] = "1"
+    env["CLAUDE_GOVERNANCE_APPROVED_PATHS"] = ".claude/settings.json"
     assert run_cli("hook", "pre", cwd=repo, input_text=protected, env=env).returncode == 0
     assert run_cli("hook", "pre", cwd=repo, input_text=json.dumps({"tool_input": {"file_path": "README.md"}})).returncode == 0
 
@@ -277,6 +281,19 @@ def test_verify_compatibility_defaults_and_optional_autofix(tmp_path: Path) -> N
     assert proc.returncode == 0, proc.stdout + proc.stderr
 
 
+def test_backups_keep_first_snapshot_when_same_file_changes_twice(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path, "backup")
+    target = repo / "AGENTS.md"
+    target.write_text("original", encoding="utf-8")
+    backup_root = repo / ".claude-governance" / "backups" / "stamp"
+
+    autofix.backup(repo, Path("AGENTS.md"), backup_root)
+    target.write_text("modified", encoding="utf-8")
+    autofix.backup(repo, Path("AGENTS.md"), backup_root)
+
+    assert (backup_root / "AGENTS.md").read_text(encoding="utf-8") == "original"
+
+
 def test_existing_policy_sensitive_paths_are_preserved(tmp_path: Path) -> None:
     repo = make_repo(tmp_path, "existing-policy")
     policy_path = repo / ".claude-governance" / "policy.json"
@@ -309,7 +326,8 @@ def test_existing_policy_sensitive_paths_are_preserved(tmp_path: Path) -> None:
     )
     assert proc.returncode == 0, proc.stdout + proc.stderr
     merged = json.loads(policy_path.read_text(encoding="utf-8"))
-    assert merged["sensitive_paths"] == exact_sensitive_paths
+    assert exact_sensitive_paths[0] in merged["sensitive_paths"]
+    assert any(item.get("id") == "payment" for item in merged["sensitive_paths"])
     assert merged["hooks"]["config_change_mode"] == "warn"
 
 
@@ -331,14 +349,14 @@ def test_installer_local_maven_checks_use_module_or_root(tmp_path: Path) -> None
     (root_repo / "pom.xml").write_text("<project></project>", encoding="utf-8")
     (root_repo / "src" / "main" / "java" / "example" / "payment").mkdir(parents=True)
     assert install(root_repo, "java-maven").returncode == 0
-    root_local = root_repo / "src" / "main" / "java" / "example" / "payment" / "CLAUDE.md"
+    root_local = root_repo / "src" / "main" / "java" / "example" / "payment" / "AGENTS.md"
     assert "- `mvn test`" in root_local.read_text(encoding="utf-8")
 
     module_repo = make_repo(tmp_path, "module-maven")
     (module_repo / "pom.xml").write_text("<project><modules><module>payment-service</module></modules></project>", encoding="utf-8")
     (module_repo / "payment-service" / "src" / "main" / "java" / "example" / "payment").mkdir(parents=True)
     assert install(module_repo, "java-maven").returncode == 0
-    module_local = module_repo / "payment-service" / "src" / "main" / "java" / "example" / "payment" / "CLAUDE.md"
+    module_local = module_repo / "payment-service" / "src" / "main" / "java" / "example" / "payment" / "AGENTS.md"
     assert "- `mvn -pl payment-service -am test`" in module_local.read_text(encoding="utf-8")
 
 
@@ -357,7 +375,7 @@ def test_mutation_vague_claude_md_must_fail(tmp_path: Path) -> None:
     bad_text = "# Project Overview\n\n" + " ".join(
         ["clean code", "best practices", "simple", "elegant", "robust", "performant", "maintainable", "high quality"] * 3
     )
-    (repo / "CLAUDE.md").write_text(bad_text, encoding="utf-8")
+    (repo / "AGENTS.md").write_text(bad_text, encoding="utf-8")
     proc = run_cli("lint", "--repo", str(repo), "--quiet")
     assert proc.returncode == 1
 
@@ -418,9 +436,14 @@ def test_verify_require_claude_fails_when_auth_unavailable(tmp_path: Path) -> No
 
 def test_ci_workflow_contract() -> None:
     workflow = Path(".github/workflows/ci.yml").read_text(encoding="utf-8")
+    governance_workflow = Path(".github/workflows/claude-md-governance.yml").read_text(encoding="utf-8")
+    assert "os: [ubuntu-latest, windows-latest]" in workflow
     assert 'python-version: ["3.10", "3.11", "3.12"]' in workflow
     assert 'requires-python = ">=3.10"' in Path("pyproject.toml").read_text(encoding="utf-8")
     assert 'python -m pip install -e ".[test]"' in workflow
     assert "python -m pytest -q" in workflow
     assert "claude-md-governance doctor" in workflow
+    assert "AGENTS.md" in governance_workflow
+    assert ".agents/**" in governance_workflow
+    assert "windows-latest" in governance_workflow
     assert policy_path("generic").exists()

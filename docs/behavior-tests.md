@@ -20,7 +20,7 @@
 输入：
 
 ```bash
-claude-md-governance behavior-test --repo . --cases tests/ai_behavior_cases.json
+codex-md-governance behavior-test --repo . --cases tests/ai_behavior_cases.json
 ```
 
 输出：JSON，包含 `status`、`failed` 和每个用例结果。

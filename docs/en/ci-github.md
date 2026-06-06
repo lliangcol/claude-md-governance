@@ -7,7 +7,7 @@ Chinese version: [../ci-github.md](../ci-github.md)
 Input:
 
 ```bash
-claude-md-governance init --repo . --preset generic --ci github --yes
+codex-md-governance init --repo . --preset generic --ci github --yes
 ```
 
 Output: `.github/workflows/claude-md-governance.yml`.
@@ -19,7 +19,7 @@ Failure handling:
 
 ## Workflow
 
-The current template runs:
+The current template runs on Ubuntu and Windows:
 
 ```bash
 python scripts/claude_md_lint.py \

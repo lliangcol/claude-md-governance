@@ -17,7 +17,7 @@
 输入：
 
 ```bash
-claude-md-governance verify --repo .
+codex-md-governance verify --repo .
 python -m pytest -q
 ```
 

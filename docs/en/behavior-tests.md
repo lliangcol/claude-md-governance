@@ -20,7 +20,7 @@ Fields:
 Input:
 
 ```bash
-claude-md-governance behavior-test --repo . --cases tests/ai_behavior_cases.json
+codex-md-governance behavior-test --repo . --cases tests/ai_behavior_cases.json
 ```
 
 Output: JSON with `status`, `failed`, and per-case results.

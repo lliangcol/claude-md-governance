@@ -11,22 +11,24 @@ GitHub Release wheel 或源码 checkout。
 
 ```bash
 python -m pip install -e ".[test]"
-claude-md-governance init --repo . --preset generic --ci github --yes
-claude-md-governance verify --repo .
+codex-md-governance init --repo . --preset generic --ci github --yes
+codex-md-governance verify --repo .
 ```
+
+`claude-md-governance` 仍可作为兼容命令使用。
 
 `v0.1.0` GitHub Release 发布后，wheel 安装路径是：
 
 ```bash
 python -m pip install "https://github.com/lliangcol/claude-md-governance/releases/download/v0.1.0/claude_md_governance-0.1.0-py3-none-any.whl"
-claude-md-governance init --repo . --preset generic --ci github --yes
-claude-md-governance verify --repo .
+codex-md-governance init --repo . --preset generic --ci github --yes
+codex-md-governance verify --repo .
 ```
 
 输出：
 
 ```text
-Installed CLAUDE.md governance into <repo>
+Installed AGENTS.md governance into <repo>
 Preset: generic; CI provider: github; ConfigChange mode: block
 Governance verification passed.
 ```
@@ -42,8 +44,8 @@ Governance verification passed.
 输入：
 
 ```bash
-claude-md-governance init --repo <repo> --preset enterprise-java-codeup --ci codeup --config-change-mode warn --yes
-claude-md-governance verify --repo <repo>
+codex-md-governance init --repo <repo> --preset enterprise-java-codeup --ci codeup --config-change-mode warn --yes
+codex-md-governance verify --repo <repo>
 ```
 
 输出：
@@ -63,17 +65,17 @@ Governance verification passed.
 `init` 安装模板：
 
 ```bash
-claude-md-governance init --repo . --preset generic --ci github --yes
+codex-md-governance init --repo . --preset generic --ci github --yes
 ```
 
 输入：目标仓库路径、preset、CI provider。
-输出：生成或合并 `CLAUDE.md`、`.claude/settings.json`、`.claude-governance/policy.json`、`scripts/` 和 CI 文件。
+输出：生成或合并 `AGENTS.md`、`.claude/settings.json`、`.codex/hooks.json`、`.claude-governance/policy.json`、`scripts/` 和 CI 文件。
 失败处理：加 `--force` 可覆盖受管文件并备份；不确定时先检查 `.claude-governance/backups/`。
 
 `verify` 验证安装：
 
 ```bash
-claude-md-governance verify --repo .
+codex-md-governance verify --repo .
 ```
 
 输入：已安装治理文件的仓库。
@@ -83,17 +85,17 @@ claude-md-governance verify --repo .
 `lint` 生成评分报告：
 
 ```bash
-claude-md-governance lint --repo . --policy .claude-governance/policy.json --output .claude-governance/score.json
+codex-md-governance lint --repo . --policy .claude-governance/policy.json --output .claude-governance/score.json
 ```
 
-输入：policy 和根 `CLAUDE.md`。
+输入：policy 和根 `AGENTS.md`。
 输出：JSON finding、score、threshold、hard_fail。
 失败处理：修复 error；warning 可按团队阈值处理。
 
 `behavior-test` 运行可选 LLM 行为测试：
 
 ```bash
-claude-md-governance behavior-test --repo . --cases tests/ai_behavior_cases.json
+codex-md-governance behavior-test --repo . --cases tests/ai_behavior_cases.json
 ```
 
 输入：行为用例 JSON 和已登录的 Claude CLI。

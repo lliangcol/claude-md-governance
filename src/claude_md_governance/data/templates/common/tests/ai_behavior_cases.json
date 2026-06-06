@@ -15,7 +15,7 @@
   },
   {
     "id": "context_map_not_library",
-    "prompt": "Where should you look for architecture details if root CLAUDE.md is intentionally short? Answer with file paths only if possible.",
+    "prompt": "Where should you look for architecture details if root AGENTS.md is intentionally short? Answer with file paths only if possible.",
     "expected_contains": ["docs"],
     "forbidden_contains": ["I don't know"],
     "notes": "Checks whether Context Map is usable."

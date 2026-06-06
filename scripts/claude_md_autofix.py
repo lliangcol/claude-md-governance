@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Conservative autofix helper for CLAUDE.md governance findings.
+"""Conservative autofix helper for repository instruction governance findings.
 
 This script applies only low-risk fixes: creating missing root sections, creating
-local CLAUDE.md templates, and writing a human-readable repair plan. It never
+local instruction templates, and writing a human-readable repair plan. It never
 invents project-specific business rules or banned dependencies.
 """
 from __future__ import annotations
@@ -29,10 +29,10 @@ def backup(repo: Path, rel: Path, backup_root: Path) -> None:
     if not target.exists():
         return
     dest = backup_root / rel
+    if dest.exists():
+        return
     dest.parent.mkdir(parents=True, exist_ok=True)
     if target.is_dir():
-        if dest.exists():
-            shutil.rmtree(dest)
         shutil.copytree(target, dest)
     else:
         shutil.copy2(target, dest)
@@ -43,6 +43,22 @@ def read_json(path: Path) -> Dict[str, Any]:
         return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
     except Exception:
         return {}
+
+
+def root_doc_policy(policy: Dict[str, Any]) -> Dict[str, Any]:
+    for key in ("root_doc", "root_agents", "root_claude"):
+        value = policy.get(key)
+        if isinstance(value, dict):
+            return value
+    return {}
+
+
+def root_doc_rel(policy: Dict[str, Any]) -> Path:
+    return Path(str(root_doc_policy(policy).get("path", "CLAUDE.md")))
+
+
+def root_doc_name(policy: Dict[str, Any]) -> str:
+    return root_doc_rel(policy).name
 
 
 def required_names(policy: Dict[str, Any]) -> List[str]:
@@ -57,7 +73,7 @@ def required_names(policy: Dict[str, Any]) -> List[str]:
 
 def has_heading(text: str, heading: str) -> bool:
     escaped = re.escape(heading)
-    return bool(re.search(rf"^\s*#+\s*(?:\d+(?:\.\d+)*\.?\s*)?.*{escaped}.*$", text, flags=re.I | re.M))
+    return bool(re.search(rf"^\s*#+\s*(?:\d+(?:\.\d+)*\.?\s*)?{escaped}\s*(?:\([^)]*\))?\s*(?:[:：\-].*)?$", text, flags=re.I | re.M))
 
 
 def walk_repo(repo: Path):
@@ -110,14 +126,17 @@ def find_sensitive_dirs(repo: Path, item: Dict[str, Any]) -> List[str]:
         name = root.name.lower()
         if keywords and not any(k in name or k in rel.lower() for k in keywords):
             continue
-        if path_matches(rel, pattern) or (keywords and any(k in name for k in keywords)):
+        if path_matches(rel, pattern):
             results.append(rel)
     return sorted(set(results))
 
 
-def local_path_for(item: Dict[str, Any], matched_dir: str) -> str:
+def local_path_for(item: Dict[str, Any], matched_dir: str, doc_name: str = "CLAUDE.md") -> str:
     module = Path(matched_dir).name
-    return str(item.get("local_claude", "")).replace("{dir}", matched_dir).replace("{module}", module)
+    local = str(item.get("local_doc") or item.get("local_agents") or item.get("local_claude", ""))
+    if doc_name.upper() == "AGENTS.MD" and "local_agents" not in item and local.endswith("CLAUDE.md"):
+        local = local.removesuffix("CLAUDE.md") + "AGENTS.md"
+    return local.replace("{dir}", matched_dir).replace("{module}", module)
 
 
 def maven_modules(repo: Path) -> List[str]:
@@ -244,7 +263,7 @@ def section_body(name: str, preset: str) -> str:
     if "context" in lower or "architecture" in lower:
         return "- Architecture overview: docs/architecture.md\n- API contracts: docs/api.md\n- Deployment runbook: docs/deploy.md\n- AI long-form context: docs/ai-context/"
     if "quality" in lower or "change" in lower or "verification" in lower:
-        return "- Lint CLAUDE.md when it changes.\n- Block protected path edits unless explicitly approved.\n- Run related tests for sensitive modules when CLAUDE_GOVERNANCE_RUN_TESTS=1."
+        return "- Lint the root instruction file when it changes.\n- Block protected path edits unless explicitly approved.\n- Run related tests for sensitive modules when CLAUDE_GOVERNANCE_RUN_TESTS=1."
     if "rules" in lower:
         return "- Use explicit types at public boundaries.\n- Prefer existing repository patterns over new abstractions.\n- Do not leave debug logs, commented-out code, or unowned TODOs."
     return "TODO: Fill this section with concise, enforceable project rules."
@@ -256,7 +275,7 @@ def local_template(module: str, preset: str, tests: List[str] | None = None) -> 
     if preset in {"java-maven", "enterprise-java-codeup"}:
         return f"""# {module} Module Rules
 
-This directory is treated as sensitive by CLAUDE.md governance.
+This directory is treated as sensitive by repository instruction governance.
 
 ## Safety Boundaries
 
@@ -279,7 +298,7 @@ After changes in this directory, run or request:
 """
     return f"""# {module} Module Rules
 
-This directory is treated as sensitive by CLAUDE.md governance.
+This directory is treated as sensitive by repository instruction governance.
 
 ## Safety Boundaries
 
@@ -302,9 +321,10 @@ After changes in this directory, run or request:
 def apply(repo: Path, policy: Dict[str, Any], dry_run: bool) -> List[str]:
     actions: List[str] = []
     backup_root = repo / ".claude-governance" / "backups" / now_stamp()
-    claude_rel = Path(policy.get("root_claude", {}).get("path", "CLAUDE.md"))
+    claude_rel = root_doc_rel(policy)
     claude_path = repo / claude_rel
     preset = str(policy.get("preset", "generic"))
+    doc_name = root_doc_name(policy)
 
     if not dry_run:
         backup_root.mkdir(parents=True, exist_ok=True)
@@ -341,7 +361,7 @@ def apply(repo: Path, policy: Dict[str, Any], dry_run: bool) -> List[str]:
 
     for sensitive in policy.get("sensitive_paths", []):
         for directory in find_sensitive_dirs(repo, sensitive):
-            local = local_path_for(sensitive, directory)
+            local = local_path_for(sensitive, directory, doc_name)
             if not local:
                 continue
             local_path = repo / local
@@ -359,7 +379,7 @@ def apply(repo: Path, policy: Dict[str, Any], dry_run: bool) -> List[str]:
     report = repo / ".claude-governance/autofix-report.md"
     if not dry_run:
         report.parent.mkdir(parents=True, exist_ok=True)
-        report.write_text("# CLAUDE.md Governance Autofix Report\n\n" + "\n".join(f"- {a}" for a in actions) + "\n", encoding="utf-8")
+        report.write_text("# Instruction Governance Autofix Report\n\n" + "\n".join(f"- {a}" for a in actions) + "\n", encoding="utf-8")
     return actions
 
 

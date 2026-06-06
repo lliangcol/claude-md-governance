@@ -12,22 +12,24 @@ Source checkout:
 
 ```bash
 python -m pip install -e ".[test]"
-claude-md-governance init --repo . --preset generic --ci github --yes
-claude-md-governance verify --repo .
+codex-md-governance init --repo . --preset generic --ci github --yes
+codex-md-governance verify --repo .
 ```
+
+`claude-md-governance` remains available as a compatibility command.
 
 After the `v0.1.0` GitHub Release is published, the wheel install path is:
 
 ```bash
 python -m pip install "https://github.com/lliangcol/claude-md-governance/releases/download/v0.1.0/claude_md_governance-0.1.0-py3-none-any.whl"
-claude-md-governance init --repo . --preset generic --ci github --yes
-claude-md-governance verify --repo .
+codex-md-governance init --repo . --preset generic --ci github --yes
+codex-md-governance verify --repo .
 ```
 
 Output:
 
 ```text
-Installed CLAUDE.md governance into <repo>
+Installed AGENTS.md governance into <repo>
 Preset: generic; CI provider: github; ConfigChange mode: block
 Governance verification passed.
 ```
@@ -43,8 +45,8 @@ Failure handling:
 Input:
 
 ```bash
-claude-md-governance init --repo <repo> --preset enterprise-java-codeup --ci codeup --config-change-mode warn --yes
-claude-md-governance verify --repo <repo>
+codex-md-governance init --repo <repo> --preset enterprise-java-codeup --ci codeup --config-change-mode warn --yes
+codex-md-governance verify --repo <repo>
 ```
 
 Output:
@@ -64,17 +66,17 @@ Failure handling:
 `init` installs templates:
 
 ```bash
-claude-md-governance init --repo . --preset generic --ci github --yes
+codex-md-governance init --repo . --preset generic --ci github --yes
 ```
 
 Input: target repo path, preset, and CI provider.
-Output: `CLAUDE.md`, `.claude/settings.json`, `.claude-governance/policy.json`, `scripts/`, and CI files.
+Output: `AGENTS.md`, `.claude/settings.json`, `.codex/hooks.json`, `.claude-governance/policy.json`, `scripts/`, and CI files.
 Failure handling: use `--force` to overwrite managed files with backups under `.claude-governance/backups/`.
 
 `verify` checks the installation:
 
 ```bash
-claude-md-governance verify --repo .
+codex-md-governance verify --repo .
 ```
 
 Input: an installed repository.
@@ -84,17 +86,17 @@ Failure handling: fix the failed item; static lint details are in `.claude-gover
 `lint` writes a score report:
 
 ```bash
-claude-md-governance lint --repo . --policy .claude-governance/policy.json --output .claude-governance/score.json
+codex-md-governance lint --repo . --policy .claude-governance/policy.json --output .claude-governance/score.json
 ```
 
-Input: policy and root `CLAUDE.md`.
+Input: policy and root `AGENTS.md`.
 Output: JSON findings, score, threshold, and hard-fail status.
 Failure handling: fix errors first; warnings depend on team policy.
 
 `behavior-test` runs optional LLM behavior tests:
 
 ```bash
-claude-md-governance behavior-test --repo . --cases tests/ai_behavior_cases.json
+codex-md-governance behavior-test --repo . --cases tests/ai_behavior_cases.json
 ```
 
 Input: behavior case JSON and a logged-in Claude CLI.

@@ -1,6 +1,6 @@
 # AI Context
 
-Store long-form, optional context here instead of placing it in root `CLAUDE.md`.
+Store long-form, optional context here instead of placing it in root `AGENTS.md`.
 
 Recommended contents:
 
@@ -9,4 +9,4 @@ Recommended contents:
 - Detailed runbooks.
 - Module-specific deep dives.
 
-Root `CLAUDE.md` should link to these files through a Context Map instead of importing them by default.
+Root `AGENTS.md` should link to these files through a Context Map instead of importing them by default.

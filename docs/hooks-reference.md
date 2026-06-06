@@ -4,7 +4,7 @@
 
 ## 注册位置
 
-安装器会合并 `.claude/settings.json`：
+安装器会合并 `.claude/settings.json`，并复制 Codex 兼容的 `.codex/hooks.json` 模板：
 
 ```json
 {
@@ -20,12 +20,19 @@
 
 输入：Claude Code hook JSON，通常包含 `tool_input.file_path`。
 输出：退出码 `0` 允许；退出码 `2` 阻止。
-失败处理：如果确需编辑受保护路径，先人工确认，再设置 `ALLOW_PROTECTED_EDIT=1`。
+失败处理：如果确需编辑受保护路径，先人工确认，再设置 `CLAUDE_GOVERNANCE_APPROVED_PATHS` 为被批准的路径或 glob。
 
 示例：
 
 ```bash
 echo '{"tool_input":{"file_path":".claude/settings.json"}}' | python scripts/claude_hook_guard.py pre
+```
+
+PowerShell 授权示例：
+
+```powershell
+$env:CLAUDE_GOVERNANCE_APPROVED_PATHS = ".claude/settings.json"
+'{"tool_input":{"file_path":".claude/settings.json"}}' | python scripts/claude_hook_guard.py pre
 ```
 
 ## PostToolUse
@@ -40,6 +47,7 @@ echo '{"tool_input":{"file_path":".claude/settings.json"}}' | python scripts/cla
 
 - `CLAUDE_GOVERNANCE_LINT_SKIP=1`：跳过 post lint。
 - `CLAUDE_GOVERNANCE_RUN_TESTS=1`：执行 policy 中的相关测试命令。
+- `CLAUDE_GOVERNANCE_COMMAND_TIMEOUT_SECONDS=300`：调整 policy 命令超时。
 - `PYTHON=<python>`：覆盖 lint 命令的 Python 解释器。
 
 ## ConfigChange

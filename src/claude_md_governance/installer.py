@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Install CLAUDE.md governance starter kit into a repository.
+"""Install repository instruction governance starter kit into a repository.
 
 Usage:
   python install.py --repo /path/to/repo --yes
@@ -8,7 +8,7 @@ Usage:
 The installer is conservative:
 - It never deletes existing content.
 - Existing files are backed up before being overwritten or merged.
-- Existing CLAUDE.md gets missing governance sections appended, not replaced.
+- Existing root instruction files get missing governance sections appended, not replaced.
 - CI provider and ConfigChange behavior are policy-driven, so Aliyun Codeup or
   Java/Maven repositories do not accidentally receive GitHub-only assumptions.
 """
@@ -44,10 +44,10 @@ def backup(repo: Path, rel: Path, backup_root: Path) -> None:
     if not target.exists():
         return
     dest = backup_root / rel
+    if dest.exists():
+        return
     dest.parent.mkdir(parents=True, exist_ok=True)
     if target.is_dir():
-        if dest.exists():
-            shutil.rmtree(dest)
         shutil.copytree(target, dest)
     else:
         shutil.copy2(target, dest)
@@ -85,6 +85,50 @@ def read_json(path: Path) -> Dict[str, Any]:
 def write_json(path: Path, data: Dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def root_doc_policy(policy: Dict[str, Any]) -> Dict[str, Any]:
+    for key in ("root_doc", "root_agents", "root_claude"):
+        value = policy.get(key)
+        if isinstance(value, dict):
+            return value
+    return {}
+
+
+def root_doc_rel(policy: Dict[str, Any]) -> Path:
+    return Path(str(root_doc_policy(policy).get("path", "CLAUDE.md")))
+
+
+def root_doc_name(policy: Dict[str, Any]) -> str:
+    return root_doc_rel(policy).name
+
+
+def merge_policy_defaults(existing: Any, defaults: Any) -> Any:
+    if isinstance(existing, dict) and isinstance(defaults, dict):
+        merged = dict(existing)
+        for key, value in defaults.items():
+            merged[key] = merge_policy_defaults(merged[key], value) if key in merged else value
+        return merged
+    if isinstance(existing, list) and isinstance(defaults, list):
+        merged_list = list(existing)
+        seen = {policy_list_identity(item) for item in merged_list}
+        for item in defaults:
+            identity = policy_list_identity(item)
+            if identity not in seen:
+                merged_list.append(item)
+                seen.add(identity)
+        return merged_list
+    return existing
+
+
+def policy_list_identity(item: Any) -> str:
+    if isinstance(item, dict):
+        for key in ("id", "name", "path"):
+            value = item.get(key)
+            if value:
+                return f"{key}:{value}"
+        return json.dumps(item, ensure_ascii=False, sort_keys=True)
+    return str(item)
 
 
 def git_remote(repo: Path) -> str:
@@ -223,8 +267,7 @@ def has_heading(text: str, names: Iterable[str]) -> bool:
     for name in names:
         escaped = re.escape(name)
         patterns = [
-            rf"^\s*#+\s*(?:\d+(?:\.\d+)*\.?\s*)?{escaped}\b",
-            rf"^\s*#+\s*(?:\d+(?:\.\d+)*\.?\s*)?.*{escaped}.*$",
+            rf"^\s*#+\s*(?:\d+(?:\.\d+)*\.?\s*)?{escaped}\s*(?:\([^)]*\))?\s*(?:[:：\-].*)?$",
         ]
         if any(re.search(pattern, text, flags=re.I | re.M) for pattern in patterns):
             return True
@@ -248,7 +291,7 @@ def section_body(name: str, stack: List[str], preset: str) -> str:
             return "- Controllers must not call persistence mappers directly.\n- Keep transaction boundaries explicit and avoid external network calls inside transactions.\n- Do not leave debug logs, commented-out code, or unowned TODOs.\n- Prefer existing repository patterns over introducing new abstractions."
         return "- Use explicit types at public boundaries.\n- Keep functions focused; split large functions when one function mixes validation, I/O, and transformation.\n- Do not leave commented-out code, debug logs, or unowned TODOs.\n- Prefer existing repository patterns over introducing new abstractions."
     if "change" in lower or "quality" in lower or "validation" in lower:
-        return "- Lint CLAUDE.md when it changes.\n- Block protected path edits unless explicitly approved.\n- Run related tests for sensitive modules when CLAUDE_GOVERNANCE_RUN_TESTS=1.\n- Keep root CLAUDE.md under the configured line and token budget."
+        return "- Lint the root instruction file when it changes.\n- Block protected path edits unless explicitly approved.\n- Run related tests for sensitive modules when CLAUDE_GOVERNANCE_RUN_TESTS=1.\n- Keep the root instruction file under the configured line and token budget."
     if "working" in lower or "workflow" in lower:
         return "- For complex changes, propose a short plan before editing.\n- For trivial fixes, edit directly and summarize the diff.\n- If uncertain, state assumptions and choose the conservative path."
     return "TODO: Fill this section with concise, enforceable project rules."
@@ -260,15 +303,16 @@ def root_claude_skeleton(policy: Dict[str, Any], stack: List[str], preset: str) 
         name = section_names(spec)[0]
         chunks.append(f"# {name}\n\n{section_body(name, stack, preset)}\n")
     if not any("Sensitive" in c for c in chunks):
-        chunks.append("# Sensitive Areas\n\n- Read local CLAUDE.md files before editing sensitive modules.\n- Ask before modifying public APIs, auth, billing/payment, database schema, migrations, or infrastructure.\n")
+        chunks.append(f"# Sensitive Areas\n\n- Read local {root_doc_name(policy)} files before editing sensitive modules.\n- Ask before modifying public APIs, auth, billing/payment, database schema, migrations, or infrastructure.\n")
     return "\n".join(chunks)
 
 
 def ensure_root_claude(repo: Path, policy: Dict[str, Any], backup_root: Path, preset: str) -> None:
-    rel = Path(policy.get("root_claude", {}).get("path", "CLAUDE.md"))
+    rel = root_doc_rel(policy)
     path = repo / rel
     stack = detect_stack(repo, preset)
     if not path.exists():
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(root_claude_skeleton(policy, stack, preset), encoding="utf-8")
         return
     text = path.read_text(encoding="utf-8", errors="replace")
@@ -315,14 +359,17 @@ def find_sensitive_dirs(repo: Path, item: Dict[str, Any]) -> List[str]:
         name = root.name.lower()
         if keywords and not any(k in name or k in rel.lower() for k in keywords):
             continue
-        if path_matches(rel, pattern) or (keywords and any(k in name for k in keywords)):
+        if path_matches(rel, pattern):
             results.append(rel)
     return sorted(set(results))
 
 
-def local_path_for(item: Dict[str, Any], matched_dir: str) -> str:
+def local_path_for(item: Dict[str, Any], matched_dir: str, doc_name: str = "CLAUDE.md") -> str:
     module = Path(matched_dir).name
-    return str(item.get("local_claude", "")).replace("{dir}", matched_dir).replace("{module}", module)
+    local = str(item.get("local_doc") or item.get("local_agents") or item.get("local_claude", ""))
+    if doc_name.upper() == "AGENTS.MD" and "local_agents" not in item and local.endswith("CLAUDE.md"):
+        local = local.removesuffix("CLAUDE.md") + "AGENTS.md"
+    return local.replace("{dir}", matched_dir).replace("{module}", module)
 
 
 def maven_modules(repo: Path) -> List[str]:
@@ -375,7 +422,7 @@ def local_claude_template(module: str, tests: Iterable[str], preset: str) -> str
     if preset in {"java-maven", "enterprise-java-codeup"}:
         return f"""# {module} Module Rules
 
-This directory is treated as sensitive by CLAUDE.md governance.
+This directory is treated as sensitive by repository instruction governance.
 
 ## Safety Boundaries
 
@@ -398,7 +445,7 @@ After changes in this directory, run or request:
 """
     return f"""# {module} Module Rules
 
-This directory is treated as sensitive by CLAUDE.md governance.
+This directory is treated as sensitive by repository instruction governance.
 
 ## Safety Boundaries
 
@@ -419,9 +466,10 @@ After changes in this directory, run or request:
 
 
 def ensure_local_claudes(repo: Path, policy: Dict[str, Any], preset: str) -> None:
+    doc_name = root_doc_name(policy)
     for item in policy.get("sensitive_paths", []):
         for d in find_sensitive_dirs(repo, item):
-            local = local_path_for(item, d)
+            local = local_path_for(item, d, doc_name)
             if not local:
                 continue
             local_path = repo / local
@@ -436,14 +484,13 @@ def install_policy(repo: Path, policy: Dict[str, Any], backup_root: Path, force:
     policy.setdefault("hooks", {})["config_change_mode"] = config_mode
     dst = repo / ".claude-governance/policy.json"
     if dst.exists() and not force:
-        # Merge non-destructively: keep existing user policy, but update versioned safe defaults if missing.
+        # Merge non-destructively: keep existing user choices, but add missing versioned defaults.
         backup(repo, Path(".claude-governance/policy.json"), backup_root)
         existing = read_json(dst)
-        for key, value in policy.items():
-            existing.setdefault(key, value)
-        existing.setdefault("hooks", {}).setdefault("config_change_mode", config_mode)
-        existing.setdefault("ci", {}).setdefault("provider", ci)
-        write_json(dst, existing)
+        merged = merge_policy_defaults(existing, policy)
+        merged.setdefault("hooks", {}).setdefault("config_change_mode", config_mode)
+        merged.setdefault("ci", {}).setdefault("provider", ci)
+        write_json(dst, merged)
     else:
         if dst.exists():
             backup(repo, Path(".claude-governance/policy.json"), backup_root)
@@ -519,7 +566,7 @@ def main() -> int:
     ensure_local_claudes(repo, policy, preset)
     chmod_scripts(repo)
 
-    print(f"Installed CLAUDE.md governance into {repo}")
+    print(f"Installed {root_doc_name(policy)} governance into {repo}")
     print(f"Preset: {preset}; CI provider: {ci}; ConfigChange mode: {config_mode}")
     print(f"Backups, if any, are under {backup_root}")
 

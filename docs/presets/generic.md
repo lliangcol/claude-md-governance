@@ -11,8 +11,8 @@
 输入：
 
 ```bash
-claude-md-governance init --repo . --preset generic --ci github --yes
-claude-md-governance verify --repo .
+codex-md-governance init --repo . --preset generic --ci github --yes
+codex-md-governance verify --repo .
 ```
 
 输出：
@@ -29,7 +29,7 @@ Governance verification passed.
 
 ## 默认规则
 
-- 根 `CLAUDE.md`：`warn_lines=160`，`max_lines=200`，`hard_fail_lines=220`。
+- 根 `AGENTS.md`：`warn_lines=160`，`max_lines=200`，`hard_fail_lines=220`。
 - 必需章节：Project Overview、Tech Stack、Do NOT introduce、Code Rules、Context Map、Quality Gates、Working Style。
 - 敏感路径：`src/auth/**`、`src/billing/**`、`src/payments/**`、`prisma/migrations/**`、`infra/**`。
 - `ConfigChange`：默认 `block`。

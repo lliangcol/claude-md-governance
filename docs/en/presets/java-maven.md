@@ -11,8 +11,8 @@ Chinese version: [../../presets/java-maven.md](../../presets/java-maven.md)
 Input:
 
 ```bash
-claude-md-governance init --repo . --preset java-maven --ci github --config-change-mode warn --yes
-claude-md-governance verify --repo .
+codex-md-governance init --repo . --preset java-maven --ci github --config-change-mode warn --yes
+codex-md-governance verify --repo .
 ```
 
 Output:
@@ -24,12 +24,12 @@ Governance verification passed.
 
 Failure handling:
 
-- Missing local `CLAUDE.md` under a sensitive directory: create it or tune `sensitive_paths`.
+- Missing local `AGENTS.md` under a sensitive directory: create it or tune `sensitive_paths`.
 - Maven command failure: check whether the substituted `{module}` matches the real Maven module name.
 
 ## Defaults
 
-- Root `CLAUDE.md`: `warn_lines=180`, `max_lines=230`, `hard_fail_lines=280`.
+- Root `AGENTS.md`: `warn_lines=180`, `max_lines=230`, `hard_fail_lines=280`.
 - Required sections: Priority and Scope, Architecture Boundaries, Core Engineering Rules, Change Control, Do NOT introduce.
 - Sensitive paths: payment, order, refund, consumer/MQ, migration.
 - Related test template: `mvn -pl {module} -am test`.

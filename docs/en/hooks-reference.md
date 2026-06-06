@@ -4,7 +4,7 @@ Chinese version: [../hooks-reference.md](../hooks-reference.md)
 
 ## Registration
 
-The installer merges `.claude/settings.json`:
+The installer merges `.claude/settings.json` and copies the Codex-compatible `.codex/hooks.json` template:
 
 ```json
 {
@@ -20,12 +20,19 @@ The installer merges `.claude/settings.json`:
 
 Input: Claude Code hook JSON, usually with `tool_input.file_path`.
 Output: exit `0` allows the edit; exit `2` blocks it.
-Failure handling: if a protected edit is explicitly approved, set `ALLOW_PROTECTED_EDIT=1`.
+Failure handling: if a protected edit is explicitly approved, set `CLAUDE_GOVERNANCE_APPROVED_PATHS` to the approved path or glob.
 
 Example:
 
 ```bash
 echo '{"tool_input":{"file_path":".claude/settings.json"}}' | python scripts/claude_hook_guard.py pre
+```
+
+PowerShell approval example:
+
+```powershell
+$env:CLAUDE_GOVERNANCE_APPROVED_PATHS = ".claude/settings.json"
+'{"tool_input":{"file_path":".claude/settings.json"}}' | python scripts/claude_hook_guard.py pre
 ```
 
 ## PostToolUse
@@ -40,6 +47,7 @@ Environment variables:
 
 - `CLAUDE_GOVERNANCE_LINT_SKIP=1`: skip post lint.
 - `CLAUDE_GOVERNANCE_RUN_TESTS=1`: run related policy test commands.
+- `CLAUDE_GOVERNANCE_COMMAND_TIMEOUT_SECONDS=300`: adjust policy command timeout.
 - `PYTHON=<python>`: override the Python interpreter used by lint.
 
 ## ConfigChange

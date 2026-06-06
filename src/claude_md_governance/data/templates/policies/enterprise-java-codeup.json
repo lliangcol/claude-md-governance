@@ -2,6 +2,14 @@
   "version": 2,
   "preset": "enterprise-java-codeup",
   "score_threshold": 75,
+  "root_doc": {
+    "path": "AGENTS.md",
+    "warn_lines": 180,
+    "max_lines": 230,
+    "hard_fail_lines": 280,
+    "warn_tokens": 4500,
+    "hard_fail_tokens": 6500
+  },
   "root_claude": {
     "path": "CLAUDE.md",
     "warn_lines": 180,
@@ -103,6 +111,7 @@
         "pay",
         "payment"
       ],
+      "local_agents": "{dir}/AGENTS.md",
       "local_claude": "{dir}/CLAUDE.md",
       "required_tests": [
         "mvn -pl {module} -am test"
@@ -115,6 +124,7 @@
       "detect_keywords": [
         "order"
       ],
+      "local_agents": "{dir}/AGENTS.md",
       "local_claude": "{dir}/CLAUDE.md",
       "required_tests": [
         "mvn -pl {module} -am test"
@@ -127,6 +137,7 @@
       "detect_keywords": [
         "refund"
       ],
+      "local_agents": "{dir}/AGENTS.md",
       "local_claude": "{dir}/CLAUDE.md",
       "required_tests": [
         "mvn -pl {module} -am test"
@@ -142,6 +153,7 @@
         "rocketmq",
         "kafka"
       ],
+      "local_agents": "{dir}/AGENTS.md",
       "local_claude": "{dir}/CLAUDE.md",
       "required_tests": [
         "mvn -pl {module} -am test"
@@ -156,6 +168,7 @@
         "flyway",
         "liquibase"
       ],
+      "local_agents": "{dir}/AGENTS.md",
       "local_claude": "{dir}/CLAUDE.md",
       "required_tests": [
         "mvn -pl {module} -am test"
@@ -166,6 +179,8 @@
   "protected_paths": [
     ".claude/settings.json",
     ".claude/hooks/**",
+    ".codex/hooks.json",
+    ".agents/**",
     ".claude-governance/policy.json",
     "scripts/claude_hook_guard.py"
   ],

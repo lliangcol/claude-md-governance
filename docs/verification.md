@@ -7,16 +7,16 @@
 输入：
 
 ```bash
-claude-md-governance verify --repo .
+codex-md-governance verify --repo .
 ```
 
 输出：
 
 ```text
-PASS: required file exists: CLAUDE.md
+PASS: required file exists: AGENTS.md
 PASS: static linter passes
 PASS: PreToolUse blocks protected settings edit
-PASS: mutation test catches bad CLAUDE.md
+PASS: mutation test catches bad root instructions
 Governance verification passed.
 ```
 
@@ -43,7 +43,7 @@ python -m pytest -q
 输入：
 
 ```bash
-claude-md-governance verify --repo . --with-claude
+codex-md-governance verify --repo . --with-claude
 ```
 
 输出：如果没有 `claude` 命令，会显示 `SKIPPED`。

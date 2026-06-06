@@ -7,7 +7,7 @@ This repository is structured as a Python package with package data templates, d
 ```bash
 python -m pip install -e ".[test]"
 python -m pytest -q
-claude-md-governance doctor
+codex-md-governance doctor
 ```
 
 Preset contributions should include policy changes, docs under `docs/presets/`, tests, and an example when practical.

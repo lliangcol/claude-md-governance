@@ -16,13 +16,13 @@
 
 1. `init` 读取目标仓库，选择 preset、CI provider 和 config mode。
 2. 安装器复制模板，合并 `.claude/settings.json`，生成或合并 policy。
-3. `lint` 读取 policy 和 `CLAUDE.md`，输出 score report。
+3. `lint` 读取 policy 和 root instruction file，输出 score report。
 4. hook guard 在 Claude Code 事件中读取同一份 policy。
 5. CI 运行 lint 和 verify，保证安装结构仍可执行。
 
 ## 命令一致性
 
-所有公开命令以 `claude-md-governance <subcommand>` 暴露。模板中仍保留 `python scripts/...`，因为安装后的目标仓库不一定安装了 Python package，但会包含本地脚本。
+所有公开命令以 `codex-md-governance <subcommand>` 暴露，`claude-md-governance` 保留为兼容 alias。模板中仍保留 `python scripts/...`，因为安装后的目标仓库不一定安装了 Python package，但会包含本地脚本。
 
 失败处理：
 

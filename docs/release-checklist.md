@@ -2,8 +2,8 @@
 
 - [ ] `python -m pip install -e ".[test]"` passes.
 - [ ] pytest pass: `python -m pytest -q`.
-- [ ] `claude-md-governance --help` lists all public commands.
-- [ ] `claude-md-governance doctor` passes.
+- [ ] `codex-md-governance --help` lists all public commands.
+- [ ] `codex-md-governance doctor` passes.
 - [ ] examples pass.
 - [ ] README commands verified.
 - [ ] no private paths.

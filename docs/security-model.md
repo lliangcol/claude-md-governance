@@ -5,8 +5,8 @@
 ## 保护目标
 
 - 防止受保护治理文件被无提示修改。
-- 让敏感业务目录拥有本地 `CLAUDE.md`。
-- 在 CI 中发现根 `CLAUDE.md` 过长、规则空泛、hook 缺失。
+- 让敏感业务目录拥有本地 `AGENTS.md`/`CLAUDE.md`。
+- 在 CI 中发现根指令过长、规则空泛、hook 缺失。
 - 对 Claude Code 配置变化给出 block 或 warn。
 
 ## 非目标
@@ -41,4 +41,16 @@ hook guard 会解析命令参数，并且不用 shell 执行。policy 命令必�
 - `yarn test`
 - `yarn run ...`
 
+每条 policy 命令默认最多运行 300 秒，可用 `CLAUDE_GOVERNANCE_COMMAND_TIMEOUT_SECONDS` 调整。
+
 失败处理：如果 policy 中的测试命令被跳过，改成 allowlist 前缀，或在 CI 中单独执行。
+
+## 受保护路径授权
+
+如果确需编辑受保护路径，先取得人工确认，再设置路径范围授权：
+
+```powershell
+$env:CLAUDE_GOVERNANCE_APPROVED_PATHS = ".claude/settings.json"
+```
+
+该变量只放行匹配的路径或 glob；不要使用全局放行。

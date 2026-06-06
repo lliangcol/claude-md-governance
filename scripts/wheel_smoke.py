@@ -16,7 +16,9 @@ REQUIRED_WHEEL_PATHS = [
     "claude_md_governance/data/templates/policies/generic.json",
     "claude_md_governance/data/templates/policies/java-maven.json",
     "claude_md_governance/data/templates/policies/enterprise-java-codeup.json",
+    "claude_md_governance/data/templates/common/.agents/skills/claude-md-governance/SKILL.md",
     "claude_md_governance/data/templates/common/.claude/skills/claude-md-governance/SKILL.md",
+    "claude_md_governance/data/templates/common/.codex/hooks.json",
     "claude_md_governance/data/templates/common/scripts/claude_md_lint.py",
     "claude_md_governance/data/templates/common/scripts/claude_hook_guard.py",
     "claude_md_governance/data/templates/common/scripts/verify_claude_governance.py",
@@ -127,9 +129,11 @@ def main() -> int:
         run([str(py), "-m", "claude_md_governance", "verify", "--repo", str(repo)])
 
         required_generated = [
-            repo / "CLAUDE.md",
+            repo / "AGENTS.md",
             repo / ".claude-governance" / "policy.json",
             repo / ".claude" / "settings.json",
+            repo / ".codex" / "hooks.json",
+            repo / ".agents" / "skills" / "claude-md-governance" / "SKILL.md",
             repo / ".claude" / "skills" / "claude-md-governance" / "SKILL.md",
             repo / ".github" / "workflows" / "claude-md-governance.yml",
             repo / "scripts" / "claude_md_lint.py",

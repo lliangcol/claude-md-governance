@@ -7,7 +7,7 @@
 输入：
 
 ```bash
-claude-md-governance init --repo . --preset generic --ci github --yes
+codex-md-governance init --repo . --preset generic --ci github --yes
 ```
 
 输出：`.github/workflows/claude-md-governance.yml`。
@@ -19,7 +19,7 @@ claude-md-governance init --repo . --preset generic --ci github --yes
 
 ## 工作流内容
 
-当前模板运行：
+当前模板在 Ubuntu 和 Windows 上运行：
 
 ```bash
 python scripts/claude_md_lint.py \

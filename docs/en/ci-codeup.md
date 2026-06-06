@@ -7,7 +7,7 @@ Chinese version: [../ci-codeup.md](../ci-codeup.md)
 Input:
 
 ```bash
-claude-md-governance init --repo . --preset enterprise-java-codeup --ci codeup --config-change-mode warn --yes
+codex-md-governance init --repo . --preset enterprise-java-codeup --ci codeup --config-change-mode warn --yes
 ```
 
 Output:
@@ -38,8 +38,12 @@ Failure handling: fix the `FAIL` line and score report findings.
 
 ## Recommended trigger paths
 
+- `AGENTS.md`
+- `**/AGENTS.md`
 - `CLAUDE.md`
 - `**/CLAUDE.md`
+- `.agents/**`
+- `.codex/**`
 - `.claude/**`
 - `.claude-governance/**`
 - `scripts/claude_*`

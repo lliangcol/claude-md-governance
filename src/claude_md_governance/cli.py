@@ -1,10 +1,11 @@
-"""Command line entry point for CLAUDE.md governance."""
+"""Command line entry point for repository instruction governance."""
 from __future__ import annotations
 
 import argparse
 import shlex
 import sys
 from collections.abc import Sequence
+from pathlib import Path
 
 from . import __version__
 
@@ -32,10 +33,17 @@ def _print_eval_command(argv: Sequence[str]) -> int:
     return 0
 
 
+def _default_prog() -> str:
+    name = Path(sys.argv[0]).name
+    if name in {"codex-md-governance", "codex-md-governance.exe", "claude-md-governance", "claude-md-governance.exe"}:
+        return name
+    return "claude-md-governance"
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="claude-md-governance",
-        description="Install, lint, repair, and verify CLAUDE.md governance.",
+        prog=_default_prog(),
+        description="Install, lint, repair, and verify AGENTS.md / CLAUDE.md governance.",
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -49,9 +57,10 @@ def build_parser() -> argparse.ArgumentParser:
     init_cmd.add_argument("--ci", default="auto", choices=["auto", "github", "codeup", "none"])
     init_cmd.add_argument("--config-change-mode", default="auto", choices=["auto", "block", "warn", "off"])
 
-    lint_cmd = sub.add_parser("lint", help="Run deterministic CLAUDE.md scoring.")
+    lint_cmd = sub.add_parser("lint", help="Run deterministic root instruction scoring.")
     lint_cmd.add_argument("--repo", default=".")
     lint_cmd.add_argument("--policy", default=".claude-governance/policy.json")
+    lint_cmd.add_argument("--root-doc", default=None)
     lint_cmd.add_argument("--claude", default=None)
     lint_cmd.add_argument("--output", default=None)
     lint_cmd.add_argument("--fail-under", type=int, default=None)
@@ -77,7 +86,7 @@ def build_parser() -> argparse.ArgumentParser:
     eval_cmd.add_argument("--print-command", action="store_true")
     eval_cmd.add_argument("--policy", default=".claude-governance/policy.json")
     eval_cmd.add_argument("--static", default=".claude-governance/score.json")
-    eval_cmd.add_argument("--claude", default="CLAUDE.md")
+    eval_cmd.add_argument("--claude", default=None)
 
     behavior_cmd = sub.add_parser("behavior-test", help="Run optional Claude CLI behavior tests.")
     behavior_cmd.add_argument("--repo", default=".")
@@ -106,8 +115,6 @@ def main(argv: Sequence[str] | None = None) -> int:
             forwarded.extend(["--ci", args.ci])
         if not _has_option(forwarded, "--config-change-mode"):
             forwarded.extend(["--config-change-mode", args.config_change_mode])
-        if "--yes" not in forwarded:
-            forwarded.append("--yes")
         return _dispatch("installer", forwarded)
     if command == "lint":
         return _dispatch("lint", forwarded)

@@ -11,8 +11,8 @@
 输入：
 
 ```bash
-claude-md-governance init --repo . --preset java-maven --ci github --config-change-mode warn --yes
-claude-md-governance verify --repo .
+codex-md-governance init --repo . --preset java-maven --ci github --config-change-mode warn --yes
+codex-md-governance verify --repo .
 ```
 
 输出：
@@ -24,12 +24,12 @@ Governance verification passed.
 
 失败处理：
 
-- 敏感目录缺少本地 `CLAUDE.md`：为 finding 中的路径创建本地规则，或调整 policy 的 `sensitive_paths`。
+- 敏感目录缺少本地 `AGENTS.md`：为 finding 中的路径创建本地规则，或调整 policy 的 `sensitive_paths`。
 - Maven 命令失败：检查 `{module}` 替换后的模块名是否符合仓库实际 Maven module。
 
 ## 默认规则
 
-- 根 `CLAUDE.md`：`warn_lines=180`，`max_lines=230`，`hard_fail_lines=280`。
+- 根 `AGENTS.md`：`warn_lines=180`，`max_lines=230`，`hard_fail_lines=280`。
 - 必需章节：Priority and Scope、Architecture Boundaries、Core Engineering Rules、Change Control、Do NOT introduce。
 - 敏感路径：payment、order、refund、consumer/MQ、migration。
 - 相关测试：默认模板为 `mvn -pl {module} -am test`。

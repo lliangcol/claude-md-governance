@@ -2,9 +2,9 @@
 
 对应英文版：[docs/en/concepts.md](en/concepts.md)
 
-## 为什么仅写 CLAUDE.md 不够
+## 为什么仅写 AGENTS.md 不够
 
-`CLAUDE.md` 是提示上下文，不是治理系统。单文件容易出现四类问题：
+`AGENTS.md` 是提示上下文，不是治理系统。单文件容易出现四类问题：
 
 - 太长：常驻上下文消耗 token，并混入不相关细节。
 - 太虚：`保持简洁`、`高质量` 这类规则不可验证。
@@ -15,10 +15,10 @@
 
 `.claude-governance/policy.json` 是机器可读契约。它定义：
 
-- 根 `CLAUDE.md` 的行数和 token 阈值。
+- 根 `AGENTS.md` 的行数和 token 阈值。
 - 必需章节和别名。
 - 空泛短语。
-- 敏感路径、本地 `CLAUDE.md` 和相关测试命令。
+- 敏感路径、本地 `AGENTS.md`/`CLAUDE.md` 和相关测试命令。
 - 受保护路径。
 - hook 需求和 `ConfigChange` 模式。
 - CI provider 和行为测试用例文件。

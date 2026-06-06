@@ -2,13 +2,13 @@
 
 Chinese version: [../concepts.md](../concepts.md)
 
-## Why CLAUDE.md alone is not enough
+## Why AGENTS.md alone is not enough
 
-`CLAUDE.md` is prompt context, not a governance system. A single file tends to become too long, too vague, disconnected from hooks and CI, and fragile when protected files or settings change.
+`AGENTS.md` is prompt context, not a governance system. A single file tends to become too long, too vague, disconnected from hooks and CI, and fragile when protected files or settings change.
 
 ## Policy as code
 
-`.claude-governance/policy.json` defines root `CLAUDE.md` budgets, required sections, vague phrases, sensitive paths, protected paths, hooks, CI provider, and behavior test case files.
+`.claude-governance/policy.json` defines root `AGENTS.md` budgets, required sections, vague phrases, sensitive paths, protected paths, hooks, CI provider, and behavior test case files.
 
 ## Deterministic checks vs optional LLM behavior tests
 

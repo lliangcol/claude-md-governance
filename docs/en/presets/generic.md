@@ -11,8 +11,8 @@ Chinese version: [../../presets/generic.md](../../presets/generic.md)
 Input:
 
 ```bash
-claude-md-governance init --repo . --preset generic --ci github --yes
-claude-md-governance verify --repo .
+codex-md-governance init --repo . --preset generic --ci github --yes
+codex-md-governance verify --repo .
 ```
 
 Output:
@@ -29,7 +29,7 @@ Failure handling:
 
 ## Defaults
 
-- Root `CLAUDE.md`: `warn_lines=160`, `max_lines=200`, `hard_fail_lines=220`.
+- Root `AGENTS.md`: `warn_lines=160`, `max_lines=200`, `hard_fail_lines=220`.
 - Required sections: Project Overview, Tech Stack, Do NOT introduce, Code Rules, Context Map, Quality Gates, Working Style.
 - Sensitive paths: `src/auth/**`, `src/billing/**`, `src/payments/**`, `prisma/migrations/**`, `infra/**`.
 - `ConfigChange`: `block`.

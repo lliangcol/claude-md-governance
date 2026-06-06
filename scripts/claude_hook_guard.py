@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List
 
 DEFAULT_POLICY_PATH = Path(os.environ.get("CLAUDE_GOVERNANCE_POLICY", ".claude-governance/policy.json"))
+DEFAULT_COMMAND_TIMEOUT_SECONDS = 300
 
 
 def normalize_path(path: str) -> str:
@@ -142,7 +143,28 @@ def run_command(command: str) -> int:
         print(f"[claude-governance] skipped non-allowlisted policy command: {command}", file=sys.stderr)
         return 0
     print(f"[claude-governance] running: {command}", file=sys.stderr)
-    return subprocess.call(command_argv(command), shell=False)
+    try:
+        timeout = int(os.environ.get("CLAUDE_GOVERNANCE_COMMAND_TIMEOUT_SECONDS", DEFAULT_COMMAND_TIMEOUT_SECONDS))
+    except ValueError:
+        timeout = DEFAULT_COMMAND_TIMEOUT_SECONDS
+    try:
+        proc = subprocess.run(command_argv(command), shell=False, timeout=timeout, check=False)
+        return int(proc.returncode)
+    except subprocess.TimeoutExpired:
+        print(f"[claude-governance] policy command timed out after {timeout}s: {command}", file=sys.stderr)
+        return 124
+
+
+def split_env_patterns(value: str) -> List[str]:
+    if not value:
+        return []
+    parts = re.split(r"[;\n,]+", value)
+    return [part.strip() for part in parts if part.strip()]
+
+
+def protected_edit_allowed(path: str) -> bool:
+    approved_patterns = split_env_patterns(os.environ.get("CLAUDE_GOVERNANCE_APPROVED_PATHS", ""))
+    return bool(approved_patterns and matches(path, approved_patterns))
 
 
 def protected_patterns(policy: Dict[str, Any]) -> List[str]:
@@ -212,11 +234,17 @@ def lint_command() -> str:
 
 def governance_path_changed(path: str) -> bool:
     normalized = normalize_path(path)
+    lower = normalized.lower()
     return (
         normalized.endswith("CLAUDE.md")
+        or normalized.endswith("AGENTS.md")
         or normalized == ".claude/settings.json"
-        or normalized.startswith(".claude/")
-        or normalized.startswith(".claude-governance/")
+        or lower == ".codex/hooks.json"
+        or lower.startswith(".claude/")
+        or lower.startswith(".codex/")
+        or lower.startswith(".agents/")
+        or lower.startswith(".claude-governance/")
+        or lower.startswith(".codex-governance/")
         or normalized in {
             "scripts/claude_hook_guard.py",
             "scripts/claude_md_lint.py",
@@ -246,11 +274,11 @@ def main() -> int:
         return 0
 
     if mode == "pre":
-        if matches(path, protected_patterns(policy)) and os.environ.get("ALLOW_PROTECTED_EDIT") != "1":
+        if matches(path, protected_patterns(policy)) and not protected_edit_allowed(path):
             block(
                 "Blocked protected edit: " + path + "\n"
-                "Reason: this path is covered by CLAUDE.md governance policy. "
-                "Set ALLOW_PROTECTED_EDIT=1 only after explicit human approval or in CI-controlled setup."
+                "Reason: this path is covered by repository instruction governance policy. "
+                "Set CLAUDE_GOVERNANCE_APPROVED_PATHS to the approved path or glob only after explicit human approval."
             )
         return 0
 
@@ -261,7 +289,7 @@ def main() -> int:
         if governance_path_changed(path):
             code = run_command(lint_command())
             if code != 0:
-                block("CLAUDE.md governance lint failed. See .claude-governance/score.json and fix before continuing.")
+                block("Instruction governance lint failed. See .claude-governance/score.json and fix before continuing.")
 
         commands = related_quality_commands(policy, path)
         if commands and os.environ.get("CLAUDE_GOVERNANCE_RUN_TESTS") == "1":

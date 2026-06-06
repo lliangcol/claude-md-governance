@@ -2,7 +2,7 @@
 
 ## Hero
 
-Keep `CLAUDE.md` short. Make rules enforceable. Stop context drift.
+Keep `AGENTS.md` short. Make rules enforceable. Stop context drift.
 
 ## Subheading
 
@@ -12,7 +12,7 @@ Make Claude Code repo rules enforceable with policy-as-code, hooks, and CI.
 
 - 200-line context budget enforcement.
 - `Do NOT introduce` rule enforcement.
-- Local CLAUDE.md for sensitive modules.
+- Local AGENTS.md for sensitive modules.
 - PreToolUse and PostToolUse hook guard.
 - GitHub, Codeup, and local-only modes.
 - Generic, Java/Maven, and enterprise-java-codeup presets.
@@ -23,7 +23,7 @@ Install from the GitHub Release wheel, run `init`, then run `verify`.
 
 ## Social Preview Copy
 
-CLAUDE.md Governance
+AGENTS.md Governance
 
 Policy-as-code + hooks + CI for Claude Code repo rules.
 

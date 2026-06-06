@@ -2,6 +2,14 @@
   "version": 2,
   "preset": "generic",
   "score_threshold": 75,
+  "root_doc": {
+    "path": "AGENTS.md",
+    "warn_lines": 160,
+    "max_lines": 200,
+    "hard_fail_lines": 220,
+    "warn_tokens": 3500,
+    "hard_fail_tokens": 5000
+  },
   "root_claude": {
     "path": "CLAUDE.md",
     "warn_lines": 160,
@@ -30,13 +38,13 @@
     "archive_paths": ["docs/archive/**", "docs/deprecated/**"]
   },
   "sensitive_paths": [
-    {"id": "auth", "path": "src/auth/**", "local_claude": "src/auth/CLAUDE.md", "required_tests": [], "protected": true},
-    {"id": "billing", "path": "src/billing/**", "local_claude": "src/billing/CLAUDE.md", "required_tests": [], "protected": true},
-    {"id": "payments", "path": "src/payments/**", "local_claude": "src/payments/CLAUDE.md", "required_tests": [], "protected": true},
-    {"id": "migrations", "path": "prisma/migrations/**", "local_claude": "prisma/CLAUDE.md", "required_tests": [], "protected": true},
-    {"id": "infra", "path": "infra/**", "local_claude": "infra/CLAUDE.md", "required_tests": [], "protected": true}
+    {"id": "auth", "path": "src/auth/**", "local_agents": "src/auth/AGENTS.md", "local_claude": "src/auth/CLAUDE.md", "required_tests": [], "protected": true},
+    {"id": "billing", "path": "src/billing/**", "local_agents": "src/billing/AGENTS.md", "local_claude": "src/billing/CLAUDE.md", "required_tests": [], "protected": true},
+    {"id": "payments", "path": "src/payments/**", "local_agents": "src/payments/AGENTS.md", "local_claude": "src/payments/CLAUDE.md", "required_tests": [], "protected": true},
+    {"id": "migrations", "path": "prisma/migrations/**", "local_agents": "prisma/AGENTS.md", "local_claude": "prisma/CLAUDE.md", "required_tests": [], "protected": true},
+    {"id": "infra", "path": "infra/**", "local_agents": "infra/AGENTS.md", "local_claude": "infra/CLAUDE.md", "required_tests": [], "protected": true}
   ],
-  "protected_paths": [".claude/settings.json", ".claude-governance/policy.json", "scripts/claude_hook_guard.py"],
+  "protected_paths": [".claude/settings.json", ".codex/hooks.json", ".agents/**", ".claude-governance/policy.json", "scripts/claude_hook_guard.py"],
   "hooks": {
     "settings_path": ".claude/settings.json",
     "require_pretool_guard": true,

@@ -1,4 +1,4 @@
-# CLAUDE.md Governance Documentation
+# AGENTS.md Governance Documentation
 
 Project README: [../../README.md](../../README.md)
 
