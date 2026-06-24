@@ -7,17 +7,86 @@ blocking. The behavior is controlled by .claude-governance/policy.json.
 from __future__ import annotations
 
 import fnmatch
+import hashlib
 import json
 import os
 import re
 import shlex
 import subprocess
 import sys
+import tempfile
+import time
 from pathlib import Path
 from typing import Any, Dict, Iterable, List
 
+try:
+    from claude_md_governance.policy_schema import PolicyValidationError, load_policy_file
+except Exception:  # pragma: no cover - used by repository-local copied scripts.
+    class PolicyValidationError(ValueError):  # type: ignore[no-redef]
+        def __init__(self, path: Path, errors: List[str]) -> None:
+            self.path = path
+            self.errors = tuple(errors)
+            super().__init__(f"Invalid policy file {path}: {'; '.join(errors)}")
+
+    def _is_non_empty_string(value: Any) -> bool:
+        return isinstance(value, str) and bool(value.strip())
+
+    def _validate_string_list(errors: List[str], value: Any, key: str) -> None:
+        if value is None:
+            return
+        if not isinstance(value, list) or any(not _is_non_empty_string(item) for item in value):
+            errors.append(f"{key} must be an array of non-empty strings")
+
+    def _validate_policy(policy: Any) -> List[str]:
+        if not isinstance(policy, dict):
+            return ["policy root must be a JSON object"]
+        errors: List[str] = []
+        version = policy.get("version")
+        if not isinstance(version, int) or isinstance(version, bool) or version < 1:
+            errors.append("version must be a positive integer")
+        if not _is_non_empty_string(policy.get("preset")):
+            errors.append("preset must be a non-empty string")
+        hooks = policy.get("hooks")
+        if not isinstance(hooks, dict):
+            errors.append("hooks must be an object")
+        else:
+            if "config_change_mode" not in hooks:
+                errors.append("hooks.config_change_mode is required")
+            mode = hooks.get("config_change_mode", "block")
+            if mode not in {"block", "warn", "off"}:
+                errors.append("hooks.config_change_mode must be one of: block, warn, off")
+        _validate_string_list(errors, policy.get("protected_paths", []), "protected_paths")
+        sensitive = policy.get("sensitive_paths", [])
+        if not isinstance(sensitive, list):
+            errors.append("sensitive_paths must be an array")
+        else:
+            for index, item in enumerate(sensitive):
+                item_path = f"sensitive_paths[{index}]"
+                if not isinstance(item, dict):
+                    errors.append(f"{item_path} must be an object")
+                    continue
+                if not _is_non_empty_string(item.get("path")):
+                    errors.append(f"{item_path}.path must be a non-empty string")
+                _validate_string_list(errors, item.get("required_tests", []), f"{item_path}.required_tests")
+                if "protected" in item and not isinstance(item.get("protected"), bool):
+                    errors.append(f"{item_path}.protected must be a boolean")
+        return errors
+
+    def load_policy_file(path: Path) -> Dict[str, Any]:
+        if not path.exists():
+            raise PolicyValidationError(path, ["policy file is missing"])
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise PolicyValidationError(path, [f"invalid JSON at line {exc.lineno}, column {exc.colno}: {exc.msg}"]) from exc
+        errors = _validate_policy(data)
+        if errors:
+            raise PolicyValidationError(path, errors)
+        return data
+
 DEFAULT_POLICY_PATH = Path(os.environ.get("CLAUDE_GOVERNANCE_POLICY", ".claude-governance/policy.json"))
 DEFAULT_COMMAND_TIMEOUT_SECONDS = 300
+DEFAULT_LINT_CACHE_SECONDS = 5
 
 
 def normalize_path(path: str) -> str:
@@ -33,15 +102,12 @@ def normalize_path(path: str) -> str:
         return resolved.as_posix().replace("\\", "/")
 
 
-def read_json(path: Path) -> Dict[str, Any]:
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
-        return {}
-
-
 def load_policy() -> Dict[str, Any]:
-    return read_json(DEFAULT_POLICY_PATH)
+    try:
+        return load_policy_file(DEFAULT_POLICY_PATH)
+    except PolicyValidationError as exc:
+        print(f"[claude-governance] {exc}", file=sys.stderr)
+        sys.exit(2)
 
 
 def read_event() -> Dict[str, Any]:
@@ -140,8 +206,10 @@ def command_allowed(command: str) -> bool:
 
 def run_command(command: str) -> int:
     if not command_allowed(command):
-        print(f"[claude-governance] skipped non-allowlisted policy command: {command}", file=sys.stderr)
-        return 0
+        print(f"[claude-governance] rejected non-allowlisted policy command: {command}", file=sys.stderr)
+        if os.environ.get("CLAUDE_GOVERNANCE_STRICT_COMMANDS", "1").lower() in {"0", "false", "off", "warn"}:
+            return 0
+        return 2
     print(f"[claude-governance] running: {command}", file=sys.stderr)
     try:
         timeout = int(os.environ.get("CLAUDE_GOVERNANCE_COMMAND_TIMEOUT_SECONDS", DEFAULT_COMMAND_TIMEOUT_SECONDS))
@@ -232,6 +300,76 @@ def lint_command() -> str:
     return f"{py} scripts/claude_md_lint.py --policy .claude-governance/policy.json --output .claude-governance/score.json --quiet"
 
 
+def _file_digest(path: Path) -> str:
+    if not path.exists() or not path.is_file():
+        return f"missing:{path.as_posix()}"
+    digest = hashlib.sha256()
+    digest.update(path.as_posix().encode("utf-8", errors="replace"))
+    digest.update(path.read_bytes())
+    return digest.hexdigest()
+
+
+def lint_cache_key(policy: Dict[str, Any]) -> str:
+    root_doc = "CLAUDE.md"
+    for key in ("root_doc", "root_agents", "root_claude"):
+        value = policy.get(key)
+        if isinstance(value, dict) and value.get("path"):
+            root_doc = str(value["path"])
+            break
+    settings_path = str(policy.get("hooks", {}).get("settings_path", ".claude/settings.json"))
+    paths = [
+        DEFAULT_POLICY_PATH,
+        Path(settings_path),
+        Path(root_doc),
+        Path("scripts/claude_hook_guard.py"),
+        Path("scripts/claude_md_lint.py"),
+    ]
+    digest = hashlib.sha256()
+    for path in paths:
+        digest.update(_file_digest(path).encode("utf-8", errors="replace"))
+    return digest.hexdigest()
+
+
+def lint_cache_file() -> Path:
+    repo_hash = hashlib.sha256(str(Path.cwd().resolve()).encode("utf-8", errors="replace")).hexdigest()[:16]
+    return Path(tempfile.gettempdir()) / "claude-md-governance" / f"hook-lint-{repo_hash}.json"
+
+
+def lint_cache_seconds() -> int:
+    try:
+        return max(0, int(os.environ.get("CLAUDE_GOVERNANCE_LINT_CACHE_SECONDS", DEFAULT_LINT_CACHE_SECONDS)))
+    except ValueError:
+        return DEFAULT_LINT_CACHE_SECONDS
+
+
+def lint_recently_passed(policy: Dict[str, Any]) -> bool:
+    ttl = lint_cache_seconds()
+    if ttl <= 0:
+        return False
+    path = lint_cache_file()
+    if not path.exists():
+        return False
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return False
+    return (
+        payload.get("key") == lint_cache_key(policy)
+        and payload.get("status") == "pass"
+        and time.time() - float(payload.get("timestamp", 0)) <= ttl
+    )
+
+
+def remember_lint_pass(policy: Dict[str, Any]) -> None:
+    ttl = lint_cache_seconds()
+    if ttl <= 0:
+        return
+    path = lint_cache_file()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {"key": lint_cache_key(policy), "status": "pass", "timestamp": time.time()}
+    path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+
 def governance_path_changed(path: str) -> bool:
     normalized = normalize_path(path)
     lower = normalized.lower()
@@ -287,9 +425,13 @@ def main() -> int:
             return warn("[claude-governance] lint skipped because CLAUDE_GOVERNANCE_LINT_SKIP=1")
 
         if governance_path_changed(path):
-            code = run_command(lint_command())
-            if code != 0:
-                block("Instruction governance lint failed. See .claude-governance/score.json and fix before continuing.")
+            if lint_recently_passed(policy):
+                warn("[claude-governance] lint skipped because an identical governance state passed recently.")
+            else:
+                code = run_command(lint_command())
+                if code != 0:
+                    block("Instruction governance lint failed. See .claude-governance/score.json and fix before continuing.")
+                remember_lint_pass(policy)
 
         commands = related_quality_commands(policy, path)
         if commands and os.environ.get("CLAUDE_GOVERNANCE_RUN_TESTS") == "1":

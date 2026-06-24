@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/claude-md-governance/policy.schema.json",
+  "title": "claude-md-governance policy",
+  "type": "object",
+  "required": ["version", "preset", "hooks"],
+  "properties": {
+    "version": {"type": "integer", "minimum": 1},
+    "preset": {"type": "string", "minLength": 1},
+    "score_threshold": {"type": "integer", "minimum": 0, "maximum": 100},
+    "root_doc": {"$ref": "#/$defs/rootDoc"},
+    "root_agents": {"$ref": "#/$defs/rootDoc"},
+    "root_claude": {"$ref": "#/$defs/rootDoc"},
+    "required_sections": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {"type": "string", "minLength": 1},
+          {
+            "type": "object",
+            "required": ["name"],
+            "properties": {
+              "name": {"type": "string", "minLength": 1},
+              "aliases": {"type": "array", "items": {"type": "string", "minLength": 1}},
+              "severity": {"type": "string", "enum": ["error", "warning"]},
+              "deduction": {"type": "integer", "minimum": 0}
+            },
+            "additionalProperties": true
+          }
+        ]
+      }
+    },
+    "protected_paths": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "sensitive_paths": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path"],
+        "properties": {
+          "id": {"type": "string"},
+          "path": {"type": "string", "minLength": 1},
+          "local_doc": {"type": "string", "minLength": 1},
+          "local_agents": {"type": "string", "minLength": 1},
+          "local_claude": {"type": "string", "minLength": 1},
+          "required_tests": {"type": "array", "items": {"type": "string", "minLength": 1}},
+          "detect_keywords": {"type": "array", "items": {"type": "string", "minLength": 1}},
+          "protected": {"type": "boolean"}
+        },
+        "additionalProperties": true
+      }
+    },
+    "hooks": {
+      "type": "object",
+      "required": ["config_change_mode"],
+      "properties": {
+        "settings_path": {"type": "string", "minLength": 1},
+        "require_pretool_guard": {"type": "boolean"},
+        "require_posttool_quality_gate": {"type": "boolean"},
+        "protected_config_review_required": {"type": "boolean"},
+        "config_change_mode": {"type": "string", "enum": ["block", "warn", "off"]}
+      },
+      "additionalProperties": true
+    },
+    "ci": {
+      "type": "object",
+      "properties": {
+        "provider": {"type": "string", "enum": ["auto", "github", "codeup", "none"]}
+      },
+      "additionalProperties": true
+    },
+    "behavior_tests": {
+      "type": "object",
+      "properties": {
+        "enabled_by_default": {"type": "boolean"},
+        "case_file": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "rootDoc": {
+      "type": "object",
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "warn_lines": {"type": "integer", "minimum": 0},
+        "max_lines": {"type": "integer", "minimum": 0},
+        "hard_fail_lines": {"type": "integer", "minimum": 0},
+        "warn_tokens": {"type": "integer", "minimum": 0},
+        "hard_fail_tokens": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": true
+    }
+  }
+}

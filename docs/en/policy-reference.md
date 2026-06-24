@@ -30,6 +30,20 @@ codex-md-governance lint --repo . --policy .claude-governance/policy.json --outp
 
 Output: JSON report with `status`, `score`, `threshold`, `hard_fail`, `findings`, and `summary`.
 
+Validate the policy schema:
+
+```bash
+codex-md-governance policy validate --repo . --policy .claude-governance/policy.json
+```
+
+Conservatively migrate an older policy shape:
+
+```bash
+codex-md-governance policy migrate --repo . --policy .claude-governance/policy.json --write
+```
+
+`migrate` only fills mechanically derivable fields such as `root_doc`, `hooks.config_change_mode`, and `ci.provider`; maintainers should still edit fields that require project knowledge.
+
 Failure handling:
 
 - `ROOT_MISSING`: create root `AGENTS.md` or the root instruction file configured by policy.

@@ -13,8 +13,77 @@ import os
 import re
 import shlex
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Tuple
+
+try:
+    from claude_md_governance.policy_schema import PolicyValidationError, load_policy_file
+except Exception:  # pragma: no cover - used by repository-local copied scripts.
+    class PolicyValidationError(ValueError):  # type: ignore[no-redef]
+        def __init__(self, path: Path, errors: List[str]) -> None:
+            self.path = path
+            self.errors = tuple(errors)
+            super().__init__(f"Invalid policy file {path}: {'; '.join(errors)}")
+
+    def _is_non_empty_string(value: Any) -> bool:
+        return isinstance(value, str) and bool(value.strip())
+
+    def _validate_string_list(errors: List[str], value: Any, key: str) -> None:
+        if value is None:
+            return
+        if not isinstance(value, list) or any(not _is_non_empty_string(item) for item in value):
+            errors.append(f"{key} must be an array of non-empty strings")
+
+    def _validate_policy(policy: Any) -> List[str]:
+        if not isinstance(policy, dict):
+            return ["policy root must be a JSON object"]
+        errors: List[str] = []
+        version = policy.get("version")
+        if not isinstance(version, int) or isinstance(version, bool) or version < 1:
+            errors.append("version must be a positive integer")
+        if not _is_non_empty_string(policy.get("preset")):
+            errors.append("preset must be a non-empty string")
+        threshold = policy.get("score_threshold", 75)
+        if not isinstance(threshold, int) or isinstance(threshold, bool) or not 0 <= threshold <= 100:
+            errors.append("score_threshold must be an integer between 0 and 100")
+        hooks = policy.get("hooks")
+        if not isinstance(hooks, dict):
+            errors.append("hooks must be an object")
+        else:
+            if "config_change_mode" not in hooks:
+                errors.append("hooks.config_change_mode is required")
+            mode = hooks.get("config_change_mode", "block")
+            if mode not in {"block", "warn", "off"}:
+                errors.append("hooks.config_change_mode must be one of: block, warn, off")
+        _validate_string_list(errors, policy.get("protected_paths", []), "protected_paths")
+        sensitive = policy.get("sensitive_paths", [])
+        if not isinstance(sensitive, list):
+            errors.append("sensitive_paths must be an array")
+        else:
+            for index, item in enumerate(sensitive):
+                item_path = f"sensitive_paths[{index}]"
+                if not isinstance(item, dict):
+                    errors.append(f"{item_path} must be an object")
+                    continue
+                if not _is_non_empty_string(item.get("path")):
+                    errors.append(f"{item_path}.path must be a non-empty string")
+                _validate_string_list(errors, item.get("required_tests", []), f"{item_path}.required_tests")
+                if "protected" in item and not isinstance(item.get("protected"), bool):
+                    errors.append(f"{item_path}.protected must be a boolean")
+        return errors
+
+    def load_policy_file(path: Path) -> Dict[str, Any]:
+        if not path.exists():
+            raise PolicyValidationError(path, ["policy file is missing"])
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise PolicyValidationError(path, [f"invalid JSON at line {exc.lineno}, column {exc.colno}: {exc.msg}"]) from exc
+        errors = _validate_policy(data)
+        if errors:
+            raise PolicyValidationError(path, errors)
+        return data
 
 DEFAULT_POLICY_PATH = ".claude-governance/policy.json"
 SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "dist", "build", "target", ".idea", ".gradle"}
@@ -30,6 +99,17 @@ DEPENDENCY_FILE_NAMES = {
     "requirements-dev.txt",
     "pyproject.toml",
 }
+
+
+@dataclass(frozen=True)
+class RepoIndex:
+    files: Tuple[str, ...]
+    dirs: Tuple[str, ...]
+    dependency_files: Tuple[Path, ...]
+
+    @property
+    def candidates(self) -> Tuple[str, ...]:
+        return self.dirs + self.files
 
 
 def load_json(path: Path) -> Dict[str, Any]:
@@ -156,15 +236,35 @@ def walk_repo(repo: Path):
         yield Path(root), dirs, files
 
 
-def dependency_mentions(repo: Path, dep: str) -> List[str]:
+def build_repo_index(repo: Path) -> RepoIndex:
+    files: List[str] = []
+    dirs_found: List[str] = []
+    dependency_files: List[Path] = []
+    for root, dirs, filenames in walk_repo(repo):
+        rel_root = root.relative_to(repo).as_posix()
+        if rel_root != ".":
+            dirs_found.append(rel_root)
+        for dirname in dirs:
+            rel = f"{rel_root}/{dirname}" if rel_root != "." else dirname
+            dirs_found.append(rel)
+        for filename in filenames:
+            rel = f"{rel_root}/{filename}" if rel_root != "." else filename
+            files.append(rel)
+            if filename in DEPENDENCY_FILE_NAMES:
+                dependency_files.append(root / filename)
+    return RepoIndex(
+        files=tuple(sorted(set(files))),
+        dirs=tuple(sorted(set(dirs_found))),
+        dependency_files=tuple(sorted(dependency_files)),
+    )
+
+
+def dependency_mentions(repo: Path, dep: str, index: RepoIndex | None = None) -> List[str]:
+    index = index or build_repo_index(repo)
     hits: List[str] = []
-    for root, dirs, files in walk_repo(repo):
-        for filename in files:
-            if filename not in DEPENDENCY_FILE_NAMES:
-                continue
-            path = Path(root) / filename
-            if phrase_hits(read_text(path), dep):
-                hits.append(display_path(repo, path))
+    for path in index.dependency_files:
+        if phrase_hits(read_text(path), dep):
+            hits.append(display_path(repo, path))
     return sorted(set(hits))
 
 
@@ -175,41 +275,31 @@ def path_matches(candidate: str, pattern: str) -> bool:
     return any(fnmatch.fnmatch(v, pattern) for v in variants)
 
 
-def glob_has_matches(repo: Path, pattern: str) -> bool:
-    for root, dirs, files in walk_repo(repo):
-        rel_root = root.relative_to(repo).as_posix()
-        if rel_root == ".":
-            rel_root = ""
-        candidates: List[str] = []
-        if rel_root:
-            candidates.append(rel_root)
-        for d in dirs:
-            candidates.append(f"{rel_root}/{d}" if rel_root else d)
-        for f in files:
-            candidates.append(f"{rel_root}/{f}" if rel_root else f)
-        if any(path_matches(c, pattern) for c in candidates):
-            return True
-    return False
+def glob_has_matches(repo: Path, pattern: str, index: RepoIndex | None = None) -> bool:
+    index = index or build_repo_index(repo)
+    return any(path_matches(candidate, pattern) for candidate in index.candidates)
 
 
-def find_sensitive_dirs(repo: Path, item: Dict[str, Any]) -> List[str]:
+def configured_local_doc(item: Dict[str, Any]) -> str:
+    return str(item.get("local_doc") or item.get("local_agents") or item.get("local_claude") or "")
+
+
+def find_sensitive_dirs(repo: Path, item: Dict[str, Any], index: RepoIndex | None = None) -> List[str]:
+    index = index or build_repo_index(repo)
     pattern = str(item.get("path", ""))
-    local = str(item.get("local_claude", ""))
+    local = configured_local_doc(item)
     keywords = [str(k).lower() for k in item.get("detect_keywords", [])]
     results: List[str] = []
 
     if "{dir}" not in local and local:
         base = pattern.split("/**")[0]
         if base and not any(ch in base for ch in "*?["):
-            if (repo / base).exists() or glob_has_matches(repo, pattern):
+            if (repo / base).exists() or glob_has_matches(repo, pattern, index):
                 results.append(base.rstrip("/"))
             return sorted(set(results))
 
-    for root, dirs, files in walk_repo(repo):
-        rel = root.relative_to(repo).as_posix()
-        if rel == ".":
-            continue
-        name = root.name.lower()
+    for rel in index.dirs:
+        name = Path(rel).name.lower()
         if keywords and not any(k in name or k in rel.lower() for k in keywords):
             continue
         if path_matches(rel, pattern):
@@ -218,7 +308,7 @@ def find_sensitive_dirs(repo: Path, item: Dict[str, Any]) -> List[str]:
 
 
 def local_path_for(item: Dict[str, Any], matched_dir: str, doc_name: str = "CLAUDE.md") -> str:
-    local = str(item.get("local_doc") or item.get("local_agents") or item.get("local_claude", ""))
+    local = configured_local_doc(item)
     if doc_name.upper() == "AGENTS.MD" and "local_agents" not in item and local.endswith("CLAUDE.md"):
         local = local.removesuffix("CLAUDE.md") + "AGENTS.md"
     module = Path(matched_dir).name
@@ -274,11 +364,16 @@ def guard_command_matches(command: str, mode: str) -> bool:
             and path_endswith(argv[2], "scripts/claude_hook_guard.py")
             and argv[3] == mode
         )
-    return len(argv) == 3 and exe in {"claude-md-governance", "claude-md-governance.exe"} and argv[1] == "hook" and argv[2] == mode
+    return (
+        len(argv) == 3
+        and exe in {"codex-md-governance", "codex-md-governance.exe", "claude-md-governance", "claude-md-governance.exe"}
+        and argv[1] == "hook"
+        and argv[2] == mode
+    )
 
 
 def has_guard_hook(settings: Dict[str, Any], event: str, mode: str, required_tools: List[str]) -> bool:
-    covered_tools = set()
+    covered_tools: set[str] = set()
     for group in settings.get("hooks", {}).get(event, []):
         matcher = str(group.get("matcher", "*"))
         for hook in group.get("hooks", []):
@@ -296,6 +391,7 @@ def lint(repo: Path, policy: Dict[str, Any], claude_path: Path) -> Dict[str, Any
     score = 100
     detected_sensitive_dirs: List[Dict[str, str]] = []
     doc_name = root_doc_name(policy)
+    repo_index = build_repo_index(repo)
 
     text = read_text(claude_path)
     if not text:
@@ -385,7 +481,7 @@ def lint(repo: Path, policy: Dict[str, Any], claude_path: Path) -> Dict[str, Any
 
         for dep in policy.get("banned_dependencies", []):
             dep_text = str(dep)
-            locations = dependency_mentions(repo, dep_text)
+            locations = dependency_mentions(repo, dep_text, repo_index)
             if locations:
                 add_finding(
                     findings,
@@ -403,10 +499,10 @@ def lint(repo: Path, policy: Dict[str, Any], claude_path: Path) -> Dict[str, Any
 
     for item in policy.get("sensitive_paths", []):
         pattern = item.get("path")
-        local = item.get("local_claude")
+        local = configured_local_doc(item)
         if not pattern or not local:
             continue
-        dirs = find_sensitive_dirs(repo, item)
+        dirs = find_sensitive_dirs(repo, item, repo_index)
         for d in dirs:
             local_rel = local_path_for(item, d, doc_name)
             detected_sensitive_dirs.append({"id": str(item.get("id", "")), "dir": d, "local_doc": local_rel})
@@ -478,7 +574,11 @@ def main() -> int:
 
     repo = Path(args.repo).resolve()
     policy_path = (repo / args.policy).resolve() if not Path(args.policy).is_absolute() else Path(args.policy)
-    policy = load_json(policy_path)
+    try:
+        policy = load_policy_file(policy_path)
+    except PolicyValidationError as exc:
+        print(f"[claude-governance] {exc}", file=sys.stderr)
+        return 2
     if args.fail_under is not None:
         policy["score_threshold"] = args.fail_under
     claude_path = resolve_root_doc_path(repo, policy, args.root_doc or args.claude)

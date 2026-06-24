@@ -30,6 +30,20 @@ codex-md-governance lint --repo . --policy .claude-governance/policy.json --outp
 
 输出：JSON report，包含 `status`、`score`、`threshold`、`hard_fail`、`findings` 和 `summary`。
 
+校验 policy schema：
+
+```bash
+codex-md-governance policy validate --repo . --policy .claude-governance/policy.json
+```
+
+保守迁移旧 policy 形态：
+
+```bash
+codex-md-governance policy migrate --repo . --policy .claude-governance/policy.json --write
+```
+
+`migrate` 只补齐可机械推导的字段，例如 `root_doc`、`hooks.config_change_mode` 和 `ci.provider`；无法推导的字段仍应由维护者显式编辑。
+
 失败处理：
 
 - `ROOT_MISSING`：创建根 `AGENTS.md` 或 policy 指定的 root instruction file。

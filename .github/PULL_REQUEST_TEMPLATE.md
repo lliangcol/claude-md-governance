@@ -4,9 +4,10 @@
 
 ## Test plan
 
-- [ ] `python -m pip install -e ".[test]"`
+- [ ] `python -m pip install -e ".[dev]"`
 - [ ] `python -m pytest -q`
-- [ ] `claude-md-governance doctor`
+- [ ] `codex-md-governance doctor`
+- [ ] `codex-md-governance policy validate --repo .`
 - [ ] Relevant example or preset smoke test
 
 ## Safety checklist

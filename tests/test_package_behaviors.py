@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 from claude_md_governance import lint
+from claude_md_governance.policy_schema import validate_policy
 from claude_md_governance.templates import policy_path, template_root
 
 
@@ -123,6 +124,31 @@ def test_sensitive_keywords_do_not_create_false_positive_without_path_match(tmp_
     ]
     (repo / "docs" / "payment-notes").mkdir(parents=True)
     assert lint.find_sensitive_dirs(repo, policy["sensitive_paths"][0]) == []
+
+
+def test_lint_reports_missing_agents_only_sensitive_local_doc(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path, "agents-only-sensitive")
+    init = run_cli("init", "--repo", str(repo), "--preset", "generic", "--ci", "none", "--yes", "--skip-verify")
+    assert init.returncode == 0, init.stdout + init.stderr
+    (repo / "src" / "payments").mkdir(parents=True)
+    policy = json.loads((repo / ".claude-governance" / "policy.json").read_text(encoding="utf-8"))
+    policy["sensitive_paths"] = [
+        {
+            "id": "payments",
+            "path": "src/payments/**",
+            "local_agents": "src/payments/AGENTS.md",
+            "protected": True,
+        }
+    ]
+    (repo / ".claude-governance" / "policy.json").write_text(json.dumps(policy), encoding="utf-8")
+
+    proc = run_cli("lint", "--repo", str(repo))
+    assert proc.returncode == 1
+    report = json.loads(proc.stdout)
+    assert any(finding["rule"] == "MISSING_LOCAL_DOC" for finding in report["findings"])
+    assert report["summary"]["detected_sensitive_dirs"] == [
+        {"id": "payments", "dir": "src/payments", "local_doc": "src/payments/AGENTS.md"}
+    ]
 
 
 def test_lint_requires_hook_matcher_coverage_for_all_edit_tools(tmp_path: Path) -> None:
@@ -260,3 +286,98 @@ def test_bad_claude_md_fails(tmp_path: Path) -> None:
     (repo / "AGENTS.md").write_text(("# Project Overview\n\n保持简洁。高质量。注重性能。\n") * 80, encoding="utf-8")
     proc = run_cli("lint", "--repo", str(repo), "--quiet")
     assert proc.returncode == 1
+
+
+def test_eval_prompt_uses_policy_root_doc_and_static_report(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path, "eval")
+    assert run_cli("init", "--repo", str(repo), "--preset", "generic", "--ci", "none", "--yes").returncode == 0
+    (repo / ".claude-governance" / "score.json").write_text(json.dumps({"status": "pass", "score": 99}), encoding="utf-8")
+
+    proc = run_cli("eval", "--repo", str(repo), "--static", ".claude-governance/score.json")
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert "POLICY_JSON" in proc.stdout
+    assert "STATIC_REPORT_JSON" in proc.stdout
+    assert "ROOT_INSTRUCTIONS (AGENTS.md)" in proc.stdout
+    assert '"score": 99' in proc.stdout
+
+
+def test_behavior_test_pass_and_fail_with_fake_claude(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path, "behavior")
+    cases = repo / "cases.json"
+    cases.write_text(
+        json.dumps(
+            [
+                {"id": "ok", "prompt": "ok prompt", "expected_contains": ["allowed"], "forbidden_contains": ["blocked"]},
+            ]
+        ),
+        encoding="utf-8",
+    )
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    if os.name == "nt":
+        fake = bin_dir / "claude.cmd"
+        fake.write_text("@echo off\necho allowed response\nexit /b 0\n", encoding="utf-8")
+    else:
+        fake = bin_dir / "claude"
+        fake.write_text("#!/bin/sh\necho allowed response\nexit 0\n", encoding="utf-8")
+        fake.chmod(0o755)
+    env = os.environ.copy()
+    env["PATH"] = str(bin_dir)
+
+    passed = run_cli("behavior-test", "--repo", str(repo), "--cases", "cases.json", env=env)
+    assert passed.returncode == 0, passed.stdout + passed.stderr
+    assert json.loads(passed.stdout)["status"] == "pass"
+
+    cases.write_text(
+        json.dumps(
+            [
+                {"id": "bad", "prompt": "bad prompt", "expected_contains": ["missing"], "forbidden_contains": []},
+            ]
+        ),
+        encoding="utf-8",
+    )
+    failed = run_cli("behavior-test", "--repo", str(repo), "--cases", "cases.json", env=env)
+    assert failed.returncode == 1
+    payload = json.loads(failed.stdout)
+    assert payload["status"] == "fail"
+    assert payload["results"][0]["ok"] is False
+
+
+def test_behavior_test_missing_cases_fails_when_claude_exists(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path, "behavior-missing-cases")
+    bin_dir = tmp_path / "bin-missing"
+    bin_dir.mkdir()
+    if os.name == "nt":
+        fake = bin_dir / "claude.cmd"
+        fake.write_text("@echo off\necho should-not-run\nexit /b 0\n", encoding="utf-8")
+    else:
+        fake = bin_dir / "claude"
+        fake.write_text("#!/bin/sh\necho should-not-run\nexit 0\n", encoding="utf-8")
+        fake.chmod(0o755)
+    env = os.environ.copy()
+    env["PATH"] = str(bin_dir)
+
+    proc = run_cli("behavior-test", "--repo", str(repo), "--cases", "missing.json", env=env)
+    assert proc.returncode == 1
+    assert "Behavior case file not found" in proc.stderr
+
+
+def test_policy_schema_reports_multiple_invalid_shapes() -> None:
+    invalid = {
+        "version": 0,
+        "preset": "",
+        "score_threshold": 101,
+        "root_doc": {"path": "", "warn_lines": -1},
+        "required_sections": [{"name": "", "aliases": [""], "severity": "note", "deduction": -1}, 42],
+        "protected_paths": [""],
+        "sensitive_paths": [{"path": "", "required_tests": [1], "protected": "yes"}, 1],
+        "hooks": {"settings_path": "", "config_change_mode": "silent", "require_pretool_guard": "yes"},
+        "ci": {"provider": "unknown"},
+        "behavior_tests": {"enabled_by_default": "yes", "case_file": ""},
+    }
+
+    errors = validate_policy(invalid)
+    assert "version must be a positive integer" in errors
+    assert "preset must be a non-empty string" in errors
+    assert "hooks.config_change_mode must be one of: block, warn, off" in errors
+    assert "ci.provider must be one of: auto, github, codeup, none" in errors

@@ -17,6 +17,44 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List
 
+try:
+    from claude_md_governance.hooks import desired_hooks, merge_hook_settings
+except Exception:  # pragma: no cover - used by repository-local copied scripts.
+    def desired_hooks(config_mode: str) -> Dict[str, Any]:
+        hooks = {
+            "PreToolUse": [
+                {
+                    "matcher": "Edit|Write|MultiEdit",
+                    "hooks": [{"type": "command", "command": "python scripts/claude_hook_guard.py pre"}],
+                }
+            ],
+            "PostToolUse": [
+                {
+                    "matcher": "Edit|Write|MultiEdit",
+                    "hooks": [{"type": "command", "command": "python scripts/claude_hook_guard.py post"}],
+                }
+            ],
+        }
+        if str(config_mode).lower() != "off":
+            hooks["ConfigChange"] = [
+                {"matcher": "", "hooks": [{"type": "command", "command": "python scripts/claude_hook_guard.py config"}]}
+            ]
+        return {"hooks": hooks}
+
+    def merge_hook_settings(current: Dict[str, Any], template: Dict[str, Any]) -> bool:
+        current.setdefault("hooks", {})
+        changed = False
+        for event, groups in template.get("hooks", {}).items():
+            current["hooks"].setdefault(event, [])
+            existing = [json.dumps(group, sort_keys=True) for group in current["hooks"][event]]
+            for group in groups:
+                encoded = json.dumps(group, sort_keys=True)
+                if encoded not in existing:
+                    current["hooks"][event].append(group)
+                    existing.append(encoded)
+                    changed = True
+        return changed
+
 SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "dist", "build", "target", ".idea", ".gradle"}
 
 
@@ -108,9 +146,13 @@ def glob_has_matches(repo: Path, pattern: str) -> bool:
     return False
 
 
+def configured_local_doc(item: Dict[str, Any]) -> str:
+    return str(item.get("local_doc") or item.get("local_agents") or item.get("local_claude") or "")
+
+
 def find_sensitive_dirs(repo: Path, item: Dict[str, Any]) -> List[str]:
     pattern = str(item.get("path", ""))
-    local = str(item.get("local_claude", ""))
+    local = configured_local_doc(item)
     keywords = [str(k).lower() for k in item.get("detect_keywords", [])]
     results: List[str] = []
     if "{dir}" not in local and local:
@@ -133,7 +175,7 @@ def find_sensitive_dirs(repo: Path, item: Dict[str, Any]) -> List[str]:
 
 def local_path_for(item: Dict[str, Any], matched_dir: str, doc_name: str = "CLAUDE.md") -> str:
     module = Path(matched_dir).name
-    local = str(item.get("local_doc") or item.get("local_agents") or item.get("local_claude", ""))
+    local = configured_local_doc(item)
     if doc_name.upper() == "AGENTS.MD" and "local_agents" not in item and local.endswith("CLAUDE.md"):
         local = local.removesuffix("CLAUDE.md") + "AGENTS.md"
     return local.replace("{dir}", matched_dir).replace("{module}", module)
@@ -211,37 +253,12 @@ def rewrite_long_imports(repo: Path, text: str, policy: Dict[str, Any]) -> tuple
     return "\n".join(lines) + ("\n" if text.endswith("\n") else ""), changed
 
 
-def desired_hooks(config_mode: str) -> Dict[str, Any]:
-    hooks = {
-        "PreToolUse": [
-            {"matcher": "Edit|Write|MultiEdit", "hooks": [{"type": "command", "command": "python scripts/claude_hook_guard.py pre"}]}
-        ],
-        "PostToolUse": [
-            {"matcher": "Edit|Write|MultiEdit", "hooks": [{"type": "command", "command": "python scripts/claude_hook_guard.py post"}]}
-        ],
-    }
-    if config_mode != "off":
-        hooks["ConfigChange"] = [
-            {"matcher": "", "hooks": [{"type": "command", "command": "python scripts/claude_hook_guard.py config"}]}
-        ]
-    return {"hooks": hooks}
-
-
 def merge_hooks(repo: Path, policy: Dict[str, Any], dry_run: bool, backup_root: Path) -> List[str]:
     settings_rel = Path(policy.get("hooks", {}).get("settings_path", ".claude/settings.json"))
     settings_path = repo / settings_rel
     current = read_json(settings_path)
-    current.setdefault("hooks", {})
-    changed = False
     template = desired_hooks(str(policy.get("hooks", {}).get("config_change_mode", "block")).lower())
-    for event, groups in template["hooks"].items():
-        current["hooks"].setdefault(event, [])
-        existing = [json.dumps(group, sort_keys=True) for group in current["hooks"][event]]
-        for group in groups:
-            encoded = json.dumps(group, sort_keys=True)
-            if encoded not in existing:
-                current["hooks"][event].append(group)
-                changed = True
+    changed = merge_hook_settings(current, template)
     if not changed:
         return []
     if not dry_run:

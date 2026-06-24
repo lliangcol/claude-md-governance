@@ -167,6 +167,106 @@ def test_hook_behavior_matrix(tmp_path: Path) -> None:
     assert "WARNING" in warned.stderr
 
 
+def test_invalid_policy_blocks_hook_and_verify_reports_schema_error(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path, "invalid-policy")
+    assert install(repo).returncode == 0
+    (repo / ".claude-governance" / "policy.json").write_text("{bad json", encoding="utf-8")
+    protected = json.dumps({"tool_input": {"file_path": ".claude/settings.json"}})
+
+    blocked = run_cli("hook", "pre", cwd=repo, input_text=protected)
+    assert blocked.returncode == 2
+    assert "invalid JSON" in blocked.stderr
+
+    lint_proc = run_cli("lint", "--repo", str(repo), "--quiet")
+    assert lint_proc.returncode == 2
+    assert "invalid JSON" in lint_proc.stderr
+
+    verify_proc = run_cli("verify", "--repo", str(repo))
+    assert verify_proc.returncode == 1
+    assert "policy schema validates" in verify_proc.stdout
+    assert "invalid JSON" in verify_proc.stderr
+
+
+def test_policy_schema_rejects_invalid_field_types(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path, "invalid-policy-types")
+    assert install(repo).returncode == 0
+    policy = json.loads((repo / ".claude-governance" / "policy.json").read_text(encoding="utf-8"))
+    policy["hooks"]["config_change_mode"] = "silent"
+    policy["protected_paths"] = [123]
+    (repo / ".claude-governance" / "policy.json").write_text(json.dumps(policy), encoding="utf-8")
+
+    proc = run_cli("lint", "--repo", str(repo), "--quiet")
+    assert proc.returncode == 2
+    assert "hooks.config_change_mode" in proc.stderr
+    assert "protected_paths" in proc.stderr
+
+
+def test_policy_validate_and_migrate_commands(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path, "policy-cli")
+    policy_path = repo / ".claude-governance" / "policy.json"
+    policy_path.parent.mkdir()
+    policy_path.write_text(
+        json.dumps({"version": 1, "preset": "legacy", "root_claude": {"path": "CLAUDE.md"}, "hooks": {}}),
+        encoding="utf-8",
+    )
+
+    invalid = run_cli("policy", "validate", "--repo", str(repo))
+    assert invalid.returncode == 1
+    assert "config_change_mode" in invalid.stdout
+
+    migrated = run_cli("policy", "migrate", "--repo", str(repo), "--write")
+    assert migrated.returncode == 0, migrated.stdout + migrated.stderr
+    payload = json.loads(migrated.stdout)
+    assert payload["changed"] is True
+    assert payload["written"] is True
+
+    valid = run_cli("policy", "validate", "--repo", str(repo))
+    assert valid.returncode == 0, valid.stdout + valid.stderr
+    updated = json.loads(policy_path.read_text(encoding="utf-8"))
+    assert updated["root_doc"]["path"] == "CLAUDE.md"
+    assert updated["hooks"]["config_change_mode"] == "block"
+
+
+def test_doctor_explain_prints_diagnostic_summary(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path, "doctor-explain")
+    assert install(repo).returncode == 0
+    proc = run_cli("doctor", "--repo", str(repo), "--explain")
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert "Diagnostic explanation:" in proc.stdout
+    assert "- status: pass" in proc.stdout
+    assert "- root_doc: AGENTS.md" in proc.stdout
+
+
+def test_repo_index_helpers_reuse_scan_results(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path, "repo-index")
+    (repo / "src" / "payments").mkdir(parents=True)
+    (repo / "src" / "payments" / "service.py").write_text("x = 1\n", encoding="utf-8")
+    (repo / "package.json").write_text(json.dumps({"dependencies": {"left-pad": "1.0.0"}}), encoding="utf-8")
+    index = lint.build_repo_index(repo)
+
+    assert "src/payments" in index.dirs
+    assert "src/payments/service.py" in index.files
+    assert lint.glob_has_matches(repo, "src/payments/**", index)
+    assert lint.dependency_mentions(repo, "left-pad", index) == ["package.json"]
+    sensitive = {"path": "src/payments/**", "local_claude": "src/payments/CLAUDE.md", "protected": True}
+    assert lint.find_sensitive_dirs(repo, sensitive, index) == ["src/payments"]
+
+
+def test_hook_lint_cache_is_keyed_by_governance_state(tmp_path: Path, monkeypatch) -> None:
+    repo = make_repo(tmp_path, "hook-cache")
+    assert install(repo).returncode == 0
+    monkeypatch.chdir(repo)
+    monkeypatch.setenv("CLAUDE_GOVERNANCE_LINT_CACHE_SECONDS", "30")
+    policy = json.loads((repo / ".claude-governance" / "policy.json").read_text(encoding="utf-8"))
+
+    assert not hook_guard.lint_recently_passed(policy)
+    hook_guard.remember_lint_pass(policy)
+    assert hook_guard.lint_recently_passed(policy)
+
+    (repo / "AGENTS.md").write_text((repo / "AGENTS.md").read_text(encoding="utf-8") + "\n", encoding="utf-8")
+    assert not hook_guard.lint_recently_passed(policy)
+
+
 def test_pre_hook_blocks_absolute_protected_path(tmp_path: Path) -> None:
     repo = make_repo(tmp_path, "absolute-hook")
     assert install(repo).returncode == 0
@@ -222,6 +322,14 @@ def test_lint_accepts_supported_hook_command_forms(tmp_path: Path) -> None:
                 "pre": "python -m claude_md_governance.cli hook pre",
                 "post": "python -m claude_md_governance.cli hook post",
                 "config": "python -m claude_md_governance.cli hook config",
+            },
+        ),
+        (
+            "codex-cli",
+            {
+                "pre": "codex-md-governance hook pre",
+                "post": "codex-md-governance hook post",
+                "config": "codex-md-governance hook config",
             },
         ),
         (
@@ -369,6 +477,14 @@ def test_policy_commands_are_tokenized_and_never_shell_chained() -> None:
     assert not hook_guard.command_allowed("bash scripts/check.sh")
 
 
+def test_non_allowlisted_policy_command_fails_strictly_by_default(monkeypatch) -> None:
+    monkeypatch.delenv("CLAUDE_GOVERNANCE_STRICT_COMMANDS", raising=False)
+    assert hook_guard.run_command("bash scripts/check.sh") == 2
+
+    monkeypatch.setenv("CLAUDE_GOVERNANCE_STRICT_COMMANDS", "warn")
+    assert hook_guard.run_command("bash scripts/check.sh") == 0
+
+
 def test_mutation_vague_claude_md_must_fail(tmp_path: Path) -> None:
     repo = make_repo(tmp_path, "mutation")
     assert install(repo).returncode == 0
@@ -442,7 +558,9 @@ def test_ci_workflow_contract() -> None:
     assert 'requires-python = ">=3.10"' in Path("pyproject.toml").read_text(encoding="utf-8")
     assert 'python -m pip install -e ".[test]"' in workflow
     assert "python -m pytest -q" in workflow
-    assert "claude-md-governance doctor" in workflow
+    assert "codex-md-governance doctor" in workflow
+    assert 'codex-md-governance = "claude_md_governance.cli:main"' in Path("pyproject.toml").read_text(encoding="utf-8")
+    assert 'claude-md-governance = "claude_md_governance.cli:main"' in Path("pyproject.toml").read_text(encoding="utf-8")
     assert "AGENTS.md" in governance_workflow
     assert ".agents/**" in governance_workflow
     assert "windows-latest" in governance_workflow

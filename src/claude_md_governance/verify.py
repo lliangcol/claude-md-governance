@@ -10,7 +10,72 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import Dict, List
+from typing import Any, Dict, List
+
+try:
+    from claude_md_governance.policy_schema import PolicyValidationError, load_policy_file
+except Exception:  # pragma: no cover - used by repository-local copied scripts.
+    class PolicyValidationError(ValueError):  # type: ignore[no-redef]
+        def __init__(self, path: Path, errors: List[str]) -> None:
+            self.path = path
+            self.errors = tuple(errors)
+            super().__init__(f"Invalid policy file {path}: {'; '.join(errors)}")
+
+    def _is_non_empty_string(value: object) -> bool:
+        return isinstance(value, str) and bool(value.strip())
+
+    def _validate_string_list(errors: List[str], value: object, key: str) -> None:
+        if value is None:
+            return
+        if not isinstance(value, list) or any(not _is_non_empty_string(item) for item in value):
+            errors.append(f"{key} must be an array of non-empty strings")
+
+    def _validate_policy(policy: object) -> List[str]:
+        if not isinstance(policy, dict):
+            return ["policy root must be a JSON object"]
+        errors: List[str] = []
+        version = policy.get("version")
+        if not isinstance(version, int) or isinstance(version, bool) or version < 1:
+            errors.append("version must be a positive integer")
+        if not _is_non_empty_string(policy.get("preset")):
+            errors.append("preset must be a non-empty string")
+        hooks = policy.get("hooks")
+        if not isinstance(hooks, dict):
+            errors.append("hooks must be an object")
+        else:
+            if "config_change_mode" not in hooks:
+                errors.append("hooks.config_change_mode is required")
+            mode = hooks.get("config_change_mode", "block")
+            if mode not in {"block", "warn", "off"}:
+                errors.append("hooks.config_change_mode must be one of: block, warn, off")
+        _validate_string_list(errors, policy.get("protected_paths", []), "protected_paths")
+        sensitive = policy.get("sensitive_paths", [])
+        if not isinstance(sensitive, list):
+            errors.append("sensitive_paths must be an array")
+        else:
+            for index, item in enumerate(sensitive):
+                item_path = f"sensitive_paths[{index}]"
+                if not isinstance(item, dict):
+                    errors.append(f"{item_path} must be an object")
+                    continue
+                if not _is_non_empty_string(item.get("path")):
+                    errors.append(f"{item_path}.path must be a non-empty string")
+                _validate_string_list(errors, item.get("required_tests", []), f"{item_path}.required_tests")
+                if "protected" in item and not isinstance(item.get("protected"), bool):
+                    errors.append(f"{item_path}.protected must be a boolean")
+        return errors
+
+    def load_policy_file(path: Path) -> Dict[str, Any]:
+        if not path.exists():
+            raise PolicyValidationError(path, ["policy file is missing"])
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise PolicyValidationError(path, [f"invalid JSON at line {exc.lineno}, column {exc.colno}: {exc.msg}"]) from exc
+        errors = _validate_policy(data)
+        if errors:
+            raise PolicyValidationError(path, errors)
+        return data
 
 
 def run(cmd: List[str], *, input_text: str | None = None, env: Dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
@@ -25,11 +90,12 @@ def assert_true(condition: bool, message: str, failures: List[str]) -> None:
         failures.append(message)
 
 
-def load_policy() -> Dict:
+def load_policy() -> tuple[Dict, List[str]]:
+    path = Path(".claude-governance/policy.json")
     try:
-        return json.loads(Path(".claude-governance/policy.json").read_text(encoding="utf-8"))
-    except Exception:
-        return {}
+        return load_policy_file(path), []
+    except PolicyValidationError as exc:
+        return {}, [str(exc)]
 
 
 def json_status(output: str) -> str:
@@ -58,17 +124,35 @@ def root_doc_path(policy: Dict) -> str:
     return "CLAUDE.md"
 
 
+def explain_result(policy: Dict, failures: List[str], *, with_claude: bool) -> None:
+    print("\nDiagnostic explanation:")
+    if failures:
+        print("- status: fail")
+        for failure in failures:
+            print(f"- unresolved: {failure}")
+    else:
+        print("- status: pass")
+    print(f"- root_doc: {root_doc_path(policy)}")
+    print(f"- config_change_mode: {config_change_mode(policy)}")
+    print(f"- ci_provider: {policy.get('ci', {}).get('provider', 'none')}")
+    print(f"- behavior_tests_requested: {with_claude}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo", default=".")
     parser.add_argument("--with-claude", action="store_true", help="Also run optional AI behavior tests through Claude CLI if available")
     parser.add_argument("--require-claude", action="store_true", help="Fail if Claude CLI behavior tests cannot run")
+    parser.add_argument("--explain", action="store_true", help="Print a concise diagnostic explanation of pass/fail state")
     args = parser.parse_args()
 
     repo = Path(args.repo).resolve()
     os.chdir(repo)
     failures: List[str] = []
-    policy = load_policy()
+    policy, policy_errors = load_policy()
+    assert_true(not policy_errors, "policy schema validates", failures)
+    for error in policy_errors:
+        print(error, file=sys.stderr)
 
     required = [
         root_doc_path(policy),
@@ -147,10 +231,15 @@ def main() -> int:
                 assert_true(behavior.returncode == 0, "AI behavior tests pass", failures)
 
     if failures:
+        if args.explain:
+            explain_result(policy, failures, with_claude=args.with_claude)
         print("\nGovernance verification failed:")
-        for f in failures:
-            print(f"- {f}")
+        for failure in failures:
+            print(f"- {failure}")
         return 1
+
+    if args.explain:
+        explain_result(policy, failures, with_claude=args.with_claude)
 
     print("\nGovernance verification passed.")
     return 0

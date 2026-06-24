@@ -24,7 +24,10 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Tuple
+from typing import Any, Dict, Iterable, List
+
+from .hooks import desired_hooks, merge_hook_settings
+from .policy_schema import PolicyValidationError, load_policy_file, validate_policy
 
 KIT_ROOT = Path(__file__).resolve().parent
 TEMPLATE_ROOT = KIT_ROOT / "data" / "templates"
@@ -171,23 +174,7 @@ def load_policy_template(preset: str) -> Dict[str, Any]:
     path = POLICY_ROOT / f"{preset}.json"
     if not path.exists():
         path = POLICY_ROOT / "generic.json"
-    return read_json(path)
-
-
-def desired_hooks(config_mode: str) -> Dict[str, Any]:
-    hooks = {
-        "PreToolUse": [
-            {"matcher": "Edit|Write|MultiEdit", "hooks": [{"type": "command", "command": "python scripts/claude_hook_guard.py pre"}]}
-        ],
-        "PostToolUse": [
-            {"matcher": "Edit|Write|MultiEdit", "hooks": [{"type": "command", "command": "python scripts/claude_hook_guard.py post"}]}
-        ],
-    }
-    if config_mode != "off":
-        hooks["ConfigChange"] = [
-            {"matcher": "", "hooks": [{"type": "command", "command": "python scripts/claude_hook_guard.py config"}]}
-        ]
-    return {"hooks": hooks}
+    return load_policy_file(path)
 
 
 def merge_settings(repo: Path, backup_root: Path, config_mode: str) -> None:
@@ -203,14 +190,7 @@ def merge_settings(repo: Path, backup_root: Path, config_mode: str) -> None:
         current = read_json(dst)
     except Exception:
         current = {}
-    current.setdefault("hooks", {})
-    for event, items in template.get("hooks", {}).items():
-        current["hooks"].setdefault(event, [])
-        for item in items:
-            item_json = json.dumps(item, sort_keys=True)
-            existing = [json.dumps(x, sort_keys=True) for x in current["hooks"].get(event, [])]
-            if item_json not in existing:
-                current["hooks"][event].append(item)
+    merge_hook_settings(current, template)
     write_json(dst, current)
 
 
@@ -341,9 +321,13 @@ def path_matches(candidate: str, pattern: str) -> bool:
     return any(fnmatch.fnmatch(v, pattern.replace("\\", "/")) for v in variants)
 
 
+def configured_local_doc(item: Dict[str, Any]) -> str:
+    return str(item.get("local_doc") or item.get("local_agents") or item.get("local_claude") or "")
+
+
 def find_sensitive_dirs(repo: Path, item: Dict[str, Any]) -> List[str]:
     pattern = str(item.get("path", ""))
-    local = str(item.get("local_claude", ""))
+    local = configured_local_doc(item)
     keywords = [str(k).lower() for k in item.get("detect_keywords", [])]
     results: List[str] = []
     if "{dir}" not in local and local:
@@ -366,7 +350,7 @@ def find_sensitive_dirs(repo: Path, item: Dict[str, Any]) -> List[str]:
 
 def local_path_for(item: Dict[str, Any], matched_dir: str, doc_name: str = "CLAUDE.md") -> str:
     module = Path(matched_dir).name
-    local = str(item.get("local_doc") or item.get("local_agents") or item.get("local_claude", ""))
+    local = configured_local_doc(item)
     if doc_name.upper() == "AGENTS.MD" and "local_agents" not in item and local.endswith("CLAUDE.md"):
         local = local.removesuffix("CLAUDE.md") + "AGENTS.md"
     return local.replace("{dir}", matched_dir).replace("{module}", module)
@@ -490,10 +474,16 @@ def install_policy(repo: Path, policy: Dict[str, Any], backup_root: Path, force:
         merged = merge_policy_defaults(existing, policy)
         merged.setdefault("hooks", {}).setdefault("config_change_mode", config_mode)
         merged.setdefault("ci", {}).setdefault("provider", ci)
+        errors = validate_policy(merged)
+        if errors:
+            raise PolicyValidationError(dst, errors)
         write_json(dst, merged)
     else:
         if dst.exists():
             backup(repo, Path(".claude-governance/policy.json"), backup_root)
+        errors = validate_policy(policy)
+        if errors:
+            raise PolicyValidationError(dst, errors)
         write_json(dst, policy)
 
 
@@ -561,7 +551,7 @@ def main() -> int:
     install_policy(repo, policy, backup_root, force=args.force, ci=ci, config_mode=config_mode)
     merge_settings(repo, backup_root, config_mode=config_mode)
     # Re-load policy in case it merged with an existing file.
-    policy = read_json(repo / ".claude-governance/policy.json")
+    policy = load_policy_file(repo / ".claude-governance/policy.json")
     ensure_root_claude(repo, policy, backup_root, preset)
     ensure_local_claudes(repo, policy, preset)
     chmod_scripts(repo)

@@ -11,9 +11,20 @@ authors = [{name = "claude-md-governance maintainers"}]
 keywords = ["codex", "agents-md", "claude", "claude-code", "governance", "cli", "policy-as-code"]
 
 [project.optional-dependencies]
-test = ["pytest>=8"]
+test = ["pytest>=8", "coverage>=7", "pytest-xdist>=3"]
 build = ["build>=1", "twine>=5"]
-dev = ["pytest>=8", "build>=1", "twine>=5"]
+quality = ["ruff>=0.14", "mypy>=1.19", "bandit>=1.9", "pip-audit>=2.10"]
+dev = [
+  "pytest>=8",
+  "coverage>=7",
+  "pytest-xdist>=3",
+  "build>=1",
+  "twine>=5",
+  "ruff>=0.14",
+  "mypy>=1.19",
+  "bandit>=1.9",
+  "pip-audit>=2.10",
+]
 
 [project.scripts]
 codex-md-governance = "claude_md_governance.cli:main"
@@ -24,6 +35,7 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 claude_md_governance = [
+  "data/schemas/*.json",
   "data/templates/**/*.json",
   "data/templates/**/*.md",
   "data/templates/**/*.py",
@@ -39,6 +51,27 @@ build-backend = "setuptools.build_meta"
 
 [tool.ruff]
 line-length = 120
+
+[tool.mypy]
+python_version = "3.10"
+check_untyped_defs = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+no_implicit_optional = true
+exclude = "src/claude_md_governance/data/templates/common/scripts/"
+
+[tool.coverage.run]
+source = ["claude_md_governance"]
+patch = ["subprocess"]
+parallel = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+
+[tool.bandit]
+skips = ["B404", "B603", "B607"]
+exclude_dirs = ["tests"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

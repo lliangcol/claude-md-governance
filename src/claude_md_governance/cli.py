@@ -14,7 +14,7 @@ def _dispatch(module_name: str, argv: Sequence[str]) -> int:
     module = __import__(f"claude_md_governance.{module_name}", fromlist=["main"])
     old_argv = sys.argv[:]
     try:
-        sys.argv = [f"claude-md-governance {module_name}", *argv]
+        sys.argv = [f"codex-md-governance {module_name}", *argv]
         return int(module.main())
     finally:
         sys.argv = old_argv
@@ -28,7 +28,7 @@ def _print_eval_command(argv: Sequence[str]) -> int:
     prompt_args = [arg for arg in argv if arg != "--print-command"]
     if not _has_option(prompt_args, "--bare"):
         prompt_args.append("--bare")
-    inner = ["claude-md-governance", "eval", *prompt_args]
+    inner = ["codex-md-governance", "eval", *prompt_args]
     print(f"claude --bare -p \"$({' '.join(shlex.quote(arg) for arg in inner)})\"")
     return 0
 
@@ -37,7 +37,7 @@ def _default_prog() -> str:
     name = Path(sys.argv[0]).name
     if name in {"codex-md-governance", "codex-md-governance.exe", "claude-md-governance", "claude-md-governance.exe"}:
         return name
-    return "claude-md-governance"
+    return "codex-md-governance"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -98,6 +98,17 @@ def build_parser() -> argparse.ArgumentParser:
     doctor_cmd.add_argument("--repo", default=".")
     doctor_cmd.add_argument("--with-claude", action="store_true")
     doctor_cmd.add_argument("--require-claude", action="store_true")
+    doctor_cmd.add_argument("--explain", action="store_true")
+
+    policy_cmd = sub.add_parser("policy", help="Validate or migrate policy JSON.")
+    policy_sub = policy_cmd.add_subparsers(dest="policy_command", required=True)
+    policy_validate = policy_sub.add_parser("validate", help="Validate policy JSON.")
+    policy_validate.add_argument("--repo", default=".")
+    policy_validate.add_argument("--policy", default=".claude-governance/policy.json")
+    policy_migrate = policy_sub.add_parser("migrate", help="Conservatively migrate policy JSON.")
+    policy_migrate.add_argument("--repo", default=".")
+    policy_migrate.add_argument("--policy", default=".claude-governance/policy.json")
+    policy_migrate.add_argument("--write", action="store_true")
     return parser
 
 
@@ -134,6 +145,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _dispatch("behavior", forwarded)
     if command == "doctor":
         return _dispatch("verify", forwarded)
+    if command == "policy":
+        return _dispatch("policy_cli", forwarded)
     parser.error(f"unknown command: {command}")
     return 2
 
