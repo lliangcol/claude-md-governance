@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import uuid
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -128,8 +129,9 @@ def verify_posttool_rejects_non_allowlisted_command(policy: Dict, failures: List
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_root = Path(temp_dir)
         sentinel = temp_root / "policy-command-ran"
-        malicious_script = Path("scripts/.verify_allowlist_malicious.py")
-        allowed_script = Path("scripts/.verify_allowlist_allowed.py")
+        script_token = uuid.uuid4().hex
+        malicious_script = Path(f"scripts/.verify_allowlist_{script_token}_malicious.py")
+        allowed_script = Path(f"scripts/.verify_allowlist_{script_token}_allowed.py")
         policy_path = temp_root / "policy.json"
         command = f"python {malicious_script.as_posix()} && python {allowed_script.as_posix()}"
         policy_copy = dict(policy)

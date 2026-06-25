@@ -17,12 +17,10 @@ files.
 
 - Branch: `feature/governance-hardening-roadmap`.
 - Baseline install: `.venv\Scripts\python.exe -m pip install -e ".[test]"`.
-- Current worktree has broad pre-existing uncommitted changes across docs,
-  templates, scripts, package modules, examples, and tests. Treat those as
-  in-flight work and avoid unrelated rewrites.
+- Current worktree was clean at the start of the 2026-06-25 maintenance round,
+  with `HEAD...@{u}` at `0 0`.
 - Latest pushed maintenance commits:
-  - `3d0ec70 test: add governance maintenance status`
-  - `d32240f test: align verify fallback policy validation`
+  - `97a3018 feat: expand governance providers and reports`
 - `dist/`, caches, `*.egg-info`, local reports, and private machine paths must
   not be committed.
 
@@ -87,10 +85,20 @@ Latest validation run after fallback-validator alignment:
 - `.\.venv\Scripts\python.exe scripts\verify_claude_governance.py`: passed.
 - `git diff --check`: passed.
 
+Current round targeted validation:
+
+- `.\.venv\Scripts\python.exe -m pytest tests\test_package_behaviors.py::test_installed_verify_script_validates_policy_without_package_import tests\test_package_behaviors.py::test_installed_verify_script_allows_parallel_runs -q`: passed.
+- `.\.venv\Scripts\python.exe -m pytest -q`: passed, `86 passed`.
+- `git diff --check`: passed.
+- `.\.venv\Scripts\python.exe scripts\claude_md_lint.py --policy .claude-governance\policy.json --output .claude-governance\score.json`: passed, score `100`.
+- `.\.venv\Scripts\python.exe scripts\verify_claude_governance.py`: passed.
+- `.\.venv\Scripts\codex-md-governance.exe doctor --repo .`: passed.
+- `.\.venv\Scripts\codex-md-governance.exe verify --repo .`: passed.
+
 ## Known Risks
 
-- Large dirty worktree makes scope control important; review only files touched
-  in the current round unless explicitly asked to reconcile all changes.
+- Maintenance rounds should stay PR-sized; review only files touched in the
+  current round unless explicitly asked to reconcile all changes.
 - Hook guard behavior has synchronized copies; any hook change must update all
   copies and tests together.
 - Policy schema has both a packaged JSON Schema and a standard-library runtime
@@ -104,14 +112,19 @@ Latest validation run after fallback-validator alignment:
    fixture, and smoke behavior end to end.
 2. P0: Continue policy schema regression coverage for edge cases not covered by
    `test_verify_script_fallback_policy_validator_matches_core_schema`.
-3. P0: Add focused installed-template smoke coverage for copied script behavior
-   when the target repository does not have the package import available.
+3. P0: Continue focused installed-template smoke coverage for copied script
+   behavior when the target repository does not have the package import
+   available. The installed `verify_claude_governance.py` fallback validator is
+   covered; remaining copied scripts can still use targeted no-package smoke
+   tests.
 
 ## Next Candidate
 
-The fallback validator comparison is complete and pushed in `d32240f`. The next
-implementation slice should be one CI provider, preferably GitLab because
-working-tree evidence already contains GitLab installer support, template files,
-and docs. A correct GitLab slice likely exceeds three files, so either get
-explicit approval to widen that round or split it carefully without shipping a
-partially usable provider.
+The fallback validator comparison is complete and pushed in `97a3018`; the
+installed verify-script no-package smoke regression and concurrent verify
+cleanup behavior are covered in the current round. The next implementation
+slice should either continue installed-script smoke coverage or pick exactly one
+CI provider, preferably GitLab because working-tree evidence already contains
+GitLab installer support, template files, and docs. A correct GitLab slice
+likely exceeds three files, so either get explicit approval to widen that round
+or split it carefully without shipping a partially usable provider.

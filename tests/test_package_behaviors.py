@@ -332,6 +332,54 @@ def test_gitlab_init_installs_pipeline_and_verifies(tmp_path: Path) -> None:
     assert "PASS: GitLab CI pipeline exists" in verify.stdout
 
 
+def test_installed_verify_script_validates_policy_without_package_import(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path, "standalone-verify")
+    proc = run_cli("init", "--repo", str(repo), "--preset", "generic", "--ci", "none", "--yes", "--skip-verify")
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+    policy_path = repo / ".claude-governance" / "policy.json"
+    policy = json.loads(policy_path.read_text(encoding="utf-8"))
+    policy["hooks"]["config_change_mode"] = "invalid"
+    policy_path.write_text(json.dumps(policy), encoding="utf-8")
+
+    verify = subprocess.run(
+        [sys.executable, "-S", "scripts/verify_claude_governance.py"],
+        cwd=repo,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+
+    assert verify.returncode == 1
+    output = verify.stdout + verify.stderr
+    assert "policy schema validates" in output
+    assert "hooks.config_change_mode must be one of: block, warn, off" in output
+
+
+def test_installed_verify_script_allows_parallel_runs(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path, "parallel-verify")
+    proc = run_cli("init", "--repo", str(repo), "--preset", "generic", "--ci", "none", "--yes", "--skip-verify")
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+    procs = [
+        subprocess.Popen(
+            [sys.executable, "scripts/verify_claude_governance.py"],
+            cwd=repo,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        for _ in range(2)
+    ]
+    results = [proc.communicate(timeout=30) for proc in procs]
+
+    for proc, (stdout, stderr) in zip(procs, results):
+        assert proc.returncode == 0, stdout + stderr
+        assert "Governance verification passed." in stdout
+    assert not list((repo / "scripts").glob(".verify_allowlist_*.py"))
+
+
 def test_jenkins_init_installs_pipeline_and_verifies(tmp_path: Path) -> None:
     repo = make_repo(tmp_path, "jenkins")
     proc = run_cli("init", "--repo", str(repo), "--preset", "generic", "--ci", "jenkins", "--yes")
