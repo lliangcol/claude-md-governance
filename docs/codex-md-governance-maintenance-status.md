@@ -20,6 +20,9 @@ files.
 - Current worktree has broad pre-existing uncommitted changes across docs,
   templates, scripts, package modules, examples, and tests. Treat those as
   in-flight work and avoid unrelated rewrites.
+- Latest pushed maintenance commits:
+  - `3d0ec70 test: add governance maintenance status`
+  - `d32240f test: align verify fallback policy validation`
 - `dist/`, caches, `*.egg-info`, local reports, and private machine paths must
   not be committed.
 
@@ -67,12 +70,22 @@ git diff --check
 
 ## Latest Baseline
 
-Run on 2026-06-25:
+Initial status run on 2026-06-25:
 
 - `.\.venv\Scripts\python.exe -m pip install -e ".[test]"`: passed.
 - `.\.venv\Scripts\python.exe -m pytest -q`: passed, `83 passed`.
 - `.\.venv\Scripts\codex-md-governance.exe doctor --repo .`: passed.
 - `.\.venv\Scripts\codex-md-governance.exe verify --repo .`: passed.
+
+Latest validation run after fallback-validator alignment:
+
+- `.\.venv\Scripts\python.exe -m pytest tests\test_validation_system.py::test_verify_script_fallback_policy_validator_matches_core_schema -q`: passed.
+- `.\.venv\Scripts\python.exe -m pytest -q`: passed, `84 passed`.
+- `.\.venv\Scripts\codex-md-governance.exe doctor --repo .`: passed.
+- `.\.venv\Scripts\codex-md-governance.exe verify --repo .`: passed.
+- `.\.venv\Scripts\python.exe scripts\claude_md_lint.py --policy .claude-governance\policy.json --output .claude-governance\score.json`: passed.
+- `.\.venv\Scripts\python.exe scripts\verify_claude_governance.py`: passed.
+- `git diff --check`: passed.
 
 ## Known Risks
 
@@ -87,16 +100,18 @@ Run on 2026-06-25:
 
 ## Highest Priority Candidates
 
-1. P0: Expand policy schema and verify regression tests for invalid scalar
-   types, especially JSON bool values in integer fields.
-2. P0: Audit copied `scripts/verify_claude_governance.py` fallback validation
-   against `policy_schema.py` so target repos without the installed package fail
-   closed consistently.
-3. P1: Pick exactly one new CI provider and verify installer, template, docs,
+1. P1: Pick exactly one new CI provider and verify installer, template, docs,
    fixture, and smoke behavior end to end.
+2. P0: Continue policy schema regression coverage for edge cases not covered by
+   `test_verify_script_fallback_policy_validator_matches_core_schema`.
+3. P0: Add focused installed-template smoke coverage for copied script behavior
+   when the target repository does not have the package import available.
 
 ## Next Candidate
 
-After this status pass, the smallest next slice is to compare the repository
-verify script fallback validator with package `policy_schema.py`, then either
-document the intentional reduced surface or sync the missing checks with tests.
+The fallback validator comparison is complete and pushed in `d32240f`. The next
+implementation slice should be one CI provider, preferably GitLab because
+working-tree evidence already contains GitLab installer support, template files,
+and docs. A correct GitLab slice likely exceeds three files, so either get
+explicit approval to widen that round or split it carefully without shipping a
+partially usable provider.
