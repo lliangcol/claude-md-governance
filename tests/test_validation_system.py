@@ -6,6 +6,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 from claude_md_governance import autofix, behavior, hook_guard, installer, lint, verify
 from claude_md_governance.templates import policy_path
 
@@ -206,6 +208,63 @@ def test_policy_schema_rejects_invalid_field_types(tmp_path: Path) -> None:
     assert verify_proc.returncode == 1
     assert "policy schema validates" in verify_proc.stdout
     assert "score_threshold" in verify_proc.stderr
+
+
+def test_verify_script_fallback_policy_validator_matches_core_schema(monkeypatch, tmp_path: Path) -> None:
+    import builtins
+    import runpy
+
+    real_import = builtins.__import__
+
+    def blocked_import(name: str, *args: object, **kwargs: object) -> object:
+        if name == "claude_md_governance.policy_schema":
+            raise ImportError("simulate target repo without installed package")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", blocked_import)
+    script_path = Path(__file__).resolve().parents[1] / "scripts" / "verify_claude_governance.py"
+    namespace = runpy.run_path(str(script_path))
+    load_policy_file = namespace["load_policy_file"]
+    validation_error = namespace["PolicyValidationError"]
+
+    policy_path = tmp_path / "policy.json"
+    policy_path.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "preset": "generic",
+                "score_threshold": True,
+                "root_doc": {"path": "AGENTS.md", "max_lines": True},
+                "required_sections": [{"name": "", "aliases": [""], "severity": "fatal", "deduction": False}],
+                "protected_paths": [".claude/**"],
+                "sensitive_paths": [
+                    {
+                        "path": "src/auth/**",
+                        "local_doc": "",
+                        "required_tests": ["pytest"],
+                        "detect_keywords": [123],
+                        "protected": "yes",
+                    }
+                ],
+                "hooks": {"config_change_mode": "block", "require_pretool_guard": "yes"},
+                "ci": {"provider": "travis"},
+                "behavior_tests": {"enabled_by_default": "yes", "case_file": ""},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(validation_error) as exc_info:
+        load_policy_file(policy_path)
+
+    error_text = str(exc_info.value)
+    assert "score_threshold" in error_text
+    assert "root_doc.max_lines" in error_text
+    assert "required_sections[0].name" in error_text
+    assert "sensitive_paths[0].detect_keywords" in error_text
+    assert "hooks.require_pretool_guard" in error_text
+    assert "ci.provider" in error_text
+    assert "behavior_tests.enabled_by_default" in error_text
 
 
 def test_policy_validate_and_migrate_commands(tmp_path: Path) -> None:
