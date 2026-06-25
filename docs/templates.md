@@ -24,6 +24,9 @@ The copied scripts are compatibility entry points for downstream repositories. M
 ## CI Templates
 
 - `github/workflows/claude-md-governance.yml` is installed to `.github/workflows/claude-md-governance.yml` only when `--ci github` or auto-detection chooses GitHub.
+- `gitlab/.gitlab-ci.yml` and `gitlab/docs/ci/gitlab-claude-md-governance.md` are installed only when `--ci gitlab` or auto-detection chooses GitLab.
+- `jenkins/Jenkinsfile` and `jenkins/docs/ci/jenkins-claude-md-governance.md` are installed only when `--ci jenkins` or auto-detection finds an existing Jenkinsfile.
+- `buildkite/.buildkite/pipeline.yml` and `buildkite/docs/ci/buildkite-claude-md-governance.md` are installed only when `--ci buildkite` or auto-detection finds an existing Buildkite pipeline.
 - `codeup/ci/codeup/claude-md-governance-step.yml` and `codeup/docs/ci/codeup-claude-md-governance.md` are installed only when `--ci codeup` or auto-detection chooses Codeup.
 - `--ci none` installs no CI assets.
 

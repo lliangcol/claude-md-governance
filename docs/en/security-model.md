@@ -41,7 +41,23 @@ The hook guard parses command arguments and executes them without a shell. Polic
 - `yarn test`
 - `yarn run ...`
 
+Python policy scripts must be repository-relative `.py` files under `scripts/`; absolute paths or `..` paths that escape `scripts/` are rejected.
+Shell control operators in any argument, such as `&&`, `||`, `;`, `|`, `<`, or `>`, are rejected so a
+shell-chain fragment cannot be treated as plain arguments while still executing the first command.
+
 Each policy command has a default 300-second timeout. Override it with `CLAUDE_GOVERNANCE_COMMAND_TIMEOUT_SECONDS`.
+
+Auditable allowlist:
+
+```bash
+codex-md-governance policy command-allowlist
+```
+
+This command prints machine-readable JSON with `shell: false`, the strict-mode
+environment variable, the timeout environment variable, allowed command forms,
+and examples. In default strict mode, non-allowlisted commands return `2`; they
+are downgraded to warnings only when `CLAUDE_GOVERNANCE_STRICT_COMMANDS=warn`,
+`0`, `false`, or `off` is set explicitly.
 
 Failure handling: if a policy command is skipped, change it to an allowlisted prefix or run it separately in CI.
 
@@ -54,3 +70,9 @@ $env:CLAUDE_GOVERNANCE_APPROVED_PATHS = ".claude/settings.json"
 ```
 
 The value matches only the approved path or glob. Do not use a global bypass.
+
+The protected set is built from `protected_paths` plus `sensitive_paths` entries with `protected: true`. The hook guard normalizes path separators and checks every path in a single event; matching checks both the lexical path and the symlink-resolved real path. Any unapproved protected path in a MultiEdit / nested edit blocks the whole event. Approval values may be repository-relative paths, in-repository absolute paths, or globs; they are split on commas, semicolons, or newlines and use the same glob matching.
+
+Paths outside the repository are outside this repository policy's auditable scope, so they exit `2` by default. The hook guard allows them only after explicit human approval and a matching outside-repository path or glob in `CLAUDE_GOVERNANCE_APPROVED_PATHS`. When an in-repository symlink resolves to an outside target, approval must match the resolved outside target; matching only the repository-relative symlink path does not allow the edit.
+
+When non-empty hook input is not a valid JSON object, the guard fails closed with exit `2` so writes are not allowed when the target path cannot be inspected.

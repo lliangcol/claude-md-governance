@@ -1,0 +1,32 @@
+pipeline {
+  agent any
+
+  stages {
+    stage('AGENTS.md Governance') {
+      when {
+        anyOf {
+          changeRequest()
+          changeset 'AGENTS.md'
+          changeset '**/AGENTS.md'
+          changeset 'CLAUDE.md'
+          changeset '**/CLAUDE.md'
+          changeset '.claude-governance/**'
+          changeset '.claude/**'
+          changeset '.codex/**'
+          changeset 'scripts/claude_*'
+          changeset 'scripts/verify_claude_governance.py'
+          changeset 'Jenkinsfile'
+        }
+      }
+      steps {
+        sh 'python scripts/claude_md_lint.py --policy .claude-governance/policy.json --output .claude-governance/score.json'
+        sh 'python scripts/verify_claude_governance.py'
+      }
+      post {
+        always {
+          archiveArtifacts artifacts: '.claude-governance/score.json', allowEmptyArchive: true
+        }
+      }
+    }
+  }
+}

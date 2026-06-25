@@ -4,7 +4,7 @@ Chinese version: [../../presets/java-maven.md](../../presets/java-maven.md)
 
 ## Use case
 
-`java-maven` fits single-module or multi-module Maven repositories. It adds Java/Maven thresholds and sensitive directory matching without binding the repo to GitHub or Codeup.
+`java-maven` fits single-module or multi-module Maven repositories. It adds Java/Maven thresholds and sensitive directory matching without binding the repo to GitHub, GitLab, Jenkins, Buildkite, or Codeup.
 
 ## Install
 

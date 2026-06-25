@@ -6,11 +6,12 @@ Chinese version: [../architecture.md](../architecture.md)
 
 - `src/claude_md_governance/cli.py`: public CLI entry.
 - `installer.py`: installs common templates, policy, hook settings, and CI templates.
+- `policy.py`: package-level policy path resolution, root-doc compatibility migration, and default merging.
 - `lint.py`: deterministic scorer.
 - `hook_guard.py`: Claude Code hook guard.
 - `verify.py`: post-install smoke verification.
 - `behavior.py`: optional Claude CLI behavior tests.
-- `data/templates/`: common, github, codeup, and policies templates.
+- `data/templates/`: common, github, gitlab, jenkins, buildkite, codeup, and policies templates.
 
 ## Data flow
 

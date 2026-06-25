@@ -5,41 +5,9 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Any
 
-from .policy_schema import PolicyValidationError, load_policy_file, validate_policy
-
-
-def resolve_policy(repo: Path, policy: str) -> Path:
-    candidate = Path(policy)
-    return candidate if candidate.is_absolute() else repo / candidate
-
-
-def migrate_policy(policy: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
-    migrated = json.loads(json.dumps(policy))
-    actions: list[str] = []
-
-    if "root_doc" not in migrated and isinstance(migrated.get("root_agents"), dict):
-        migrated["root_doc"] = dict(migrated["root_agents"])
-        actions.append("copied root_agents to root_doc")
-    if "root_doc" not in migrated and isinstance(migrated.get("root_claude"), dict):
-        migrated["root_doc"] = dict(migrated["root_claude"])
-        actions.append("copied root_claude to root_doc")
-    if "root_doc" not in migrated:
-        migrated["root_doc"] = {"path": "AGENTS.md"}
-        actions.append("added root_doc.path=AGENTS.md")
-
-    hooks = migrated.setdefault("hooks", {})
-    if isinstance(hooks, dict) and "config_change_mode" not in hooks:
-        hooks["config_change_mode"] = "block"
-        actions.append("added hooks.config_change_mode=block")
-
-    ci = migrated.setdefault("ci", {})
-    if isinstance(ci, dict) and "provider" not in ci:
-        ci["provider"] = "none"
-        actions.append("added ci.provider=none")
-
-    return migrated, actions
+from .hook_guard import command_allowlist_report
+from .policy import PolicyValidationError, load_policy_file, migrate_policy, resolve_policy_path, validate_policy
 
 
 def main() -> int:
@@ -55,9 +23,16 @@ def main() -> int:
     migrate_cmd.add_argument("--policy", default=".claude-governance/policy.json")
     migrate_cmd.add_argument("--write", action="store_true", help="Write migrated policy in place.")
 
+    sub.add_parser("command-allowlist", help="Print the hook policy command allowlist as JSON.")
+
     args = parser.parse_args()
+
+    if args.command == "command-allowlist":
+        print(json.dumps(command_allowlist_report(), ensure_ascii=False, indent=2))
+        return 0
+
     repo = Path(args.repo).resolve()
-    policy_path = resolve_policy(repo, args.policy)
+    policy_path = resolve_policy_path(repo, args.policy)
 
     if args.command == "validate":
         try:

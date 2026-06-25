@@ -100,6 +100,7 @@ Deterministic checks:
 ```bash
 codex-md-governance verify --repo .
 codex-md-governance lint --repo . --policy .claude-governance/policy.json --output .claude-governance/score.json
+codex-md-governance report --repo . --score .claude-governance/score.json --output .claude-governance/report.md
 ```
 
 Optional Claude CLI behavior tests:
@@ -136,8 +137,12 @@ demo fixtures, and governance rule requests.
 - [Policy Reference](docs/en/policy-reference.md) / [规则参考](docs/policy-reference.md)
 - [Hooks Reference](docs/en/hooks-reference.md) / [Hooks 参考](docs/hooks-reference.md)
 - [GitHub CI](docs/en/ci-github.md) / [GitHub CI](docs/ci-github.md)
+- [GitLab CI](docs/en/ci-gitlab.md) / [GitLab CI](docs/ci-gitlab.md)
+- [Jenkins](docs/en/ci-jenkins.md) / [Jenkins](docs/ci-jenkins.md)
+- [Buildkite](docs/en/ci-buildkite.md) / [Buildkite](docs/ci-buildkite.md)
 - [Codeup CI](docs/en/ci-codeup.md) / [Codeup CI](docs/ci-codeup.md)
 - [Verification](docs/en/verification.md) / [验证](docs/verification.md)
+- [Reports](docs/en/reports.md) / [报告](docs/reports.md)
 - [Behavior Tests](docs/en/behavior-tests.md) / [行为测试](docs/behavior-tests.md)
 - [Release Checklist](docs/release-checklist.md)
 - [Launch Plan](docs/launch-plan.md)

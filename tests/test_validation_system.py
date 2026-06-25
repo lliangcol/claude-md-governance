@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from claude_md_governance import autofix, behavior, hook_guard, installer, lint, verify
+from claude_md_governance import autofix, behavior, hook_guard, installer, lint, policy as policy_helpers, verify
 from claude_md_governance.templates import policy_path
 
 
@@ -44,6 +44,49 @@ def test_policy_loading_defaults_and_aliases() -> None:
     assert lint.has_section("# 1. Overview\n", ["Project Overview", "Overview"])
 
 
+def test_policy_helpers_migrate_and_merge_defaults() -> None:
+    legacy = {
+        "version": 1,
+        "preset": "legacy",
+        "root_claude": {"path": "CLAUDE.md", "max_lines": 120},
+        "hooks": {},
+        "sensitive_paths": [{"id": "auth", "path": "src/auth/**"}],
+    }
+
+    migrated, actions = policy_helpers.migrate_policy(legacy)
+
+    assert migrated["root_doc"] == {"path": "CLAUDE.md", "max_lines": 120}
+    assert migrated["hooks"]["config_change_mode"] == "block"
+    assert migrated["ci"]["provider"] == "none"
+    assert actions == [
+        "copied root_claude to root_doc",
+        "added hooks.config_change_mode=block",
+        "added ci.provider=none",
+    ]
+    assert "root_doc" not in legacy
+
+    existing = policy_helpers.normalize_policy_for_template_merge(legacy)
+    defaults = {
+        "root_doc": {"path": "AGENTS.md", "max_lines": 200},
+        "hooks": {"config_change_mode": "warn", "settings_path": ".claude/settings.json"},
+        "ci": {"provider": "github"},
+        "sensitive_paths": [
+            {"id": "auth", "path": "src/auth/**"},
+            {"id": "billing", "path": "src/billing/**"},
+        ],
+    }
+    merged = policy_helpers.merge_policy_defaults(existing, defaults)
+
+    assert merged["root_doc"]["path"] == "CLAUDE.md"
+    assert merged["hooks"]["config_change_mode"] == "warn"
+    assert merged["hooks"]["settings_path"] == ".claude/settings.json"
+    assert merged["ci"]["provider"] == "github"
+    assert merged["sensitive_paths"] == [
+        {"id": "auth", "path": "src/auth/**"},
+        {"id": "billing", "path": "src/billing/**"},
+    ]
+
+
 def test_cli_init_defaults_are_honored_by_wrapper(tmp_path: Path) -> None:
     repo = make_repo(tmp_path, "enterprise-java-codeup-name-should-not-change-cli-default")
     (repo / "pom.xml").write_text("<project></project>", encoding="utf-8")
@@ -63,6 +106,21 @@ def test_cli_init_defaults_are_honored_by_wrapper(tmp_path: Path) -> None:
     assert proc.returncode == 0, proc.stdout + proc.stderr
     enterprise_policy = json.loads((enterprise_repo / ".claude-governance" / "policy.json").read_text(encoding="utf-8"))
     assert enterprise_policy["hooks"]["config_change_mode"] == "warn"
+
+
+def test_ci_auto_detection_for_local_provider_files(tmp_path: Path) -> None:
+    gitlab_repo = make_repo(tmp_path, "gitlab-auto")
+    (gitlab_repo / ".gitlab-ci.yml").write_text("stages: []\n", encoding="utf-8")
+    assert installer.detect_ci(gitlab_repo, "auto", "generic") == "gitlab"
+
+    jenkins_repo = make_repo(tmp_path, "jenkins-auto")
+    (jenkins_repo / "Jenkinsfile").write_text("pipeline { agent any }\n", encoding="utf-8")
+    assert installer.detect_ci(jenkins_repo, "auto", "generic") == "jenkins"
+
+    buildkite_repo = make_repo(tmp_path, "buildkite-auto")
+    (buildkite_repo / ".buildkite").mkdir()
+    (buildkite_repo / ".buildkite" / "pipeline.yml").write_text("steps: []\n", encoding="utf-8")
+    assert installer.detect_ci(buildkite_repo, "auto", "generic") == "buildkite"
 
 
 def test_line_token_vague_import_and_section_rules(tmp_path: Path) -> None:
@@ -123,6 +181,9 @@ def test_init_appends_required_sections_only_when_headings_exist(tmp_path: Path)
 def test_integration_sample_repositories(tmp_path: Path) -> None:
     cases = [
         ("generic-repo", "generic", "github", None),
+        ("gitlab-repo", "generic", "gitlab", None),
+        ("jenkins-repo", "generic", "jenkins", None),
+        ("buildkite-repo", "generic", "buildkite", None),
         ("java-maven-repo", "java-maven", "none", "pom.xml"),
         ("enterprise-java-codeup-repo", "enterprise-java-codeup", "codeup", "pom.xml"),
         ("existing-settings-repo", "generic", "none", ".claude/settings.json"),
@@ -146,6 +207,54 @@ def test_integration_sample_repositories(tmp_path: Path) -> None:
     assert init_bad.returncode == 1
     assert run_cli("lint", "--repo", str(bad), "--quiet").returncode == 1
     assert run_cli("verify", "--repo", str(bad)).returncode == 1
+
+
+def test_root_instruction_layouts_init_lint_and_verify(tmp_path: Path) -> None:
+    agents_repo = make_repo(tmp_path, "agents-only-root")
+    (agents_repo / "AGENTS.md").write_text("# Project Overview\n\nExisting AGENTS root.\n", encoding="utf-8")
+    agents_init = install(agents_repo)
+    assert agents_init.returncode == 0, agents_init.stdout + agents_init.stderr
+    assert (agents_repo / "AGENTS.md").exists()
+    assert not (agents_repo / "CLAUDE.md").exists()
+    assert run_cli("lint", "--repo", str(agents_repo), "--quiet").returncode == 0
+    assert run_cli("verify", "--repo", str(agents_repo)).returncode == 0
+
+    legacy_repo = make_repo(tmp_path, "legacy-claude-root")
+    (legacy_repo / ".claude-governance").mkdir()
+    (legacy_repo / ".claude-governance" / "policy.json").write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "preset": "legacy",
+                "root_claude": {"path": "CLAUDE.md"},
+                "hooks": {"config_change_mode": "block"},
+                "ci": {"provider": "none"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    (legacy_repo / "CLAUDE.md").write_text("# Project Overview\n\nExisting CLAUDE root.\n", encoding="utf-8")
+    legacy_init = install(legacy_repo)
+    assert legacy_init.returncode == 0, legacy_init.stdout + legacy_init.stderr
+    legacy_policy = json.loads((legacy_repo / ".claude-governance" / "policy.json").read_text(encoding="utf-8"))
+    assert legacy_policy["root_doc"]["path"] == "CLAUDE.md"
+    assert (legacy_repo / "CLAUDE.md").exists()
+    assert not (legacy_repo / "AGENTS.md").exists()
+    assert run_cli("lint", "--repo", str(legacy_repo), "--quiet").returncode == 0
+    legacy_doctor = run_cli("doctor", "--repo", str(legacy_repo), "--explain")
+    assert legacy_doctor.returncode == 0, legacy_doctor.stdout + legacy_doctor.stderr
+    assert "- root_doc: CLAUDE.md" in legacy_doctor.stdout
+
+    mixed_repo = make_repo(tmp_path, "mixed-root-docs")
+    (mixed_repo / "CLAUDE.md").write_text("# Existing Claude Notes\n\nPreserve this file.\n", encoding="utf-8")
+    mixed_init = install(mixed_repo)
+    assert mixed_init.returncode == 0, mixed_init.stdout + mixed_init.stderr
+    mixed_policy = json.loads((mixed_repo / ".claude-governance" / "policy.json").read_text(encoding="utf-8"))
+    assert mixed_policy["root_doc"]["path"] == "AGENTS.md"
+    assert (mixed_repo / "AGENTS.md").exists()
+    assert "Preserve this file." in (mixed_repo / "CLAUDE.md").read_text(encoding="utf-8")
+    assert run_cli("lint", "--repo", str(mixed_repo), "--quiet").returncode == 0
+    assert run_cli("verify", "--repo", str(mixed_repo)).returncode == 0
 
 
 def test_hook_behavior_matrix(tmp_path: Path) -> None:
@@ -187,6 +296,23 @@ def test_invalid_policy_blocks_hook_and_verify_reports_schema_error(tmp_path: Pa
     assert verify_proc.returncode == 1
     assert "policy schema validates" in verify_proc.stdout
     assert "invalid JSON" in verify_proc.stderr
+
+
+def test_hook_empty_input_allows_and_bad_event_json_fails_closed(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path, "bad-hook-json")
+    assert install(repo).returncode == 0
+
+    empty = run_cli("hook", "pre", cwd=repo, input_text="")
+    assert empty.returncode == 0
+
+    malformed = run_cli("hook", "pre", cwd=repo, input_text="{bad json")
+    assert malformed.returncode == 2
+    assert "invalid hook event" in malformed.stderr
+    assert "invalid JSON" in malformed.stderr
+
+    array_payload = run_cli("hook", "pre", cwd=repo, input_text="[]")
+    assert array_payload.returncode == 2
+    assert "hook event must be a JSON object" in array_payload.stderr
 
 
 def test_policy_schema_rejects_invalid_field_types(tmp_path: Path) -> None:
@@ -293,6 +419,29 @@ def test_policy_validate_and_migrate_commands(tmp_path: Path) -> None:
     assert updated["hooks"]["config_change_mode"] == "block"
 
 
+def test_policy_command_allowlist_is_machine_readable_and_matches_guard() -> None:
+    proc = run_cli("policy", "command-allowlist")
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    payload = json.loads(proc.stdout)
+
+    assert payload["status"] == "pass"
+    assert payload["shell"] is False
+    assert payload["strict_by_default"] is True
+    assert payload["strict_env"] == "CLAUDE_GOVERNANCE_STRICT_COMMANDS"
+    assert payload["timeout_env"] == "CLAUDE_GOVERNANCE_COMMAND_TIMEOUT_SECONDS"
+    forms = payload["forms"]
+    assert {form["name"] for form in forms} == {"python-policy-script", "maven", "node-package-script"}
+
+    examples = [example for form in forms for example in form["examples"]]
+    assert examples
+    for example in examples:
+        assert hook_guard.command_allowed(example), example
+
+    rejected = ["python -c 'print(1)'", "python ../scripts/check.py", "bash scripts/check.sh"]
+    for command in rejected:
+        assert not hook_guard.command_allowed(command), command
+
+
 def test_doctor_explain_prints_diagnostic_summary(tmp_path: Path) -> None:
     repo = make_repo(tmp_path, "doctor-explain")
     assert install(repo).returncode == 0
@@ -340,6 +489,111 @@ def test_pre_hook_blocks_absolute_protected_path(tmp_path: Path) -> None:
     assert run_cli("hook", "pre", cwd=repo, input_text=protected).returncode == 2
     parent_relative = json.dumps({"tool_input": {"file_path": f"../{repo.name}/.claude/settings.json"}})
     assert run_cli("hook", "pre", cwd=repo, input_text=parent_relative).returncode == 2
+
+
+def test_pre_hook_approved_paths_accept_absolute_and_split_patterns(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path, "approval-patterns")
+    assert install(repo).returncode == 0
+    env = os.environ.copy()
+    env["CLAUDE_GOVERNANCE_APPROVED_PATHS"] = (
+        f"README.md,{(repo / '.claude' / 'settings.json').resolve()};\n"
+        "src/auth/**"
+    )
+
+    relative_settings = json.dumps({"tool_input": {"file_path": ".claude/settings.json"}})
+    assert run_cli("hook", "pre", cwd=repo, input_text=relative_settings, env=env).returncode == 0
+
+    absolute_settings = json.dumps({"tool_input": {"file_path": str((repo / ".claude" / "settings.json").resolve())}})
+    assert run_cli("hook", "pre", cwd=repo, input_text=absolute_settings, env=env).returncode == 0
+
+    sensitive_path = json.dumps({"tool_input": {"file_path": "src/auth/service.py"}})
+    assert run_cli("hook", "pre", cwd=repo, input_text=sensitive_path).returncode == 2
+    assert run_cli("hook", "pre", cwd=repo, input_text=sensitive_path, env=env).returncode == 0
+
+    unapproved_policy = json.dumps({"tool_input": {"file_path": ".claude-governance/policy.json"}})
+    blocked = run_cli("hook", "pre", cwd=repo, input_text=unapproved_policy, env=env)
+    assert blocked.returncode == 2
+    assert "Blocked protected edit: .claude-governance/policy.json" in blocked.stderr
+
+
+def test_pre_hook_blocks_outside_repo_paths_unless_explicitly_approved(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path, "outside-repo-hook")
+    assert install(repo).returncode == 0
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    outside_file = outside / "notes.txt"
+
+    absolute_event = json.dumps({"tool_input": {"file_path": str(outside_file.resolve())}})
+    blocked_absolute = run_cli("hook", "pre", cwd=repo, input_text=absolute_event)
+    assert blocked_absolute.returncode == 2
+    assert "Blocked outside-repo edit:" in blocked_absolute.stderr
+
+    parent_relative_event = json.dumps({"tool_input": {"file_path": "../outside/notes.txt"}})
+    blocked_parent_relative = run_cli("hook", "pre", cwd=repo, input_text=parent_relative_event)
+    assert blocked_parent_relative.returncode == 2
+    assert "Blocked outside-repo edit:" in blocked_parent_relative.stderr
+
+    env = os.environ.copy()
+    env["CLAUDE_GOVERNANCE_APPROVED_PATHS"] = str(outside_file.resolve())
+    allowed = run_cli("hook", "pre", cwd=repo, input_text=absolute_event, env=env)
+    assert allowed.returncode == 0
+
+
+def make_symlink_or_skip(target: Path, link: Path, *, target_is_directory: bool) -> None:
+    try:
+        os.symlink(target, link, target_is_directory=target_is_directory)
+    except (OSError, NotImplementedError) as exc:
+        pytest.skip(f"symlink creation is unavailable: {exc}")
+
+
+def test_pre_hook_blocks_symlink_paths_that_match_or_resolve_to_protected_paths(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path, "symlink-hook")
+    assert install(repo).returncode == 0
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    protected_dir = repo / "src" / "auth"
+    protected_dir.mkdir(parents=True)
+
+    outside_link = protected_dir / "outside-link"
+    make_symlink_or_skip(outside, outside_link, target_is_directory=True)
+    protected_by_lexical_path = json.dumps({"tool_input": {"file_path": "src/auth/outside-link/secret.py"}})
+    lexical = run_cli("hook", "pre", cwd=repo, input_text=protected_by_lexical_path)
+    assert lexical.returncode == 2
+    assert "Blocked protected edit: src/auth/outside-link/secret.py" in lexical.stderr
+
+    settings_link = repo / "settings-link.json"
+    make_symlink_or_skip(repo / ".claude" / "settings.json", settings_link, target_is_directory=False)
+    protected_by_resolved_path = json.dumps({"tool_input": {"file_path": "settings-link.json"}})
+    resolved = run_cli("hook", "pre", cwd=repo, input_text=protected_by_resolved_path)
+    assert resolved.returncode == 2
+    assert "Blocked protected edit: settings-link.json" in resolved.stderr
+
+
+def test_pre_hook_requires_resolved_outside_path_approval_for_symlink_escape(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path, "symlink-outside-approval")
+    assert install(repo).returncode == 0
+    outside = tmp_path / "outside-target"
+    outside.mkdir()
+    outside_file = outside / "notes.txt"
+    outside_file.write_text("outside\n", encoding="utf-8")
+    outside_link = repo / "outside-link"
+    make_symlink_or_skip(outside, outside_link, target_is_directory=True)
+    event = json.dumps({"tool_input": {"file_path": "outside-link/notes.txt"}})
+
+    blocked = run_cli("hook", "pre", cwd=repo, input_text=event)
+    assert blocked.returncode == 2
+    assert "Blocked outside-repo edit:" in blocked.stderr
+
+    symlink_env = os.environ.copy()
+    symlink_env["CLAUDE_GOVERNANCE_APPROVED_PATHS"] = "outside-link/**"
+    still_blocked = run_cli("hook", "pre", cwd=repo, input_text=event, env=symlink_env)
+    assert still_blocked.returncode == 2
+    assert "Blocked outside-repo edit:" in still_blocked.stderr
+
+    outside_env = os.environ.copy()
+    outside_env["CLAUDE_GOVERNANCE_APPROVED_PATHS"] = str(outside_file.resolve())
+    allowed = run_cli("hook", "pre", cwd=repo, input_text=event, env=outside_env)
+    assert allowed.returncode == 0
 
 
 def test_lint_rejects_invalid_hook_type_and_mode_prefix(tmp_path: Path) -> None:
@@ -536,16 +790,38 @@ def test_installer_local_maven_checks_use_module_or_root(tmp_path: Path) -> None
 
 def test_policy_commands_are_tokenized_and_never_shell_chained() -> None:
     assert hook_guard.command_allowed("python scripts/check.py")
+    assert hook_guard.command_allowed("python scripts/nested/check.py")
     assert hook_guard.command_allowed("mvn -pl service test")
     assert hook_guard.command_allowed("npm run test:unit")
     assert not hook_guard.command_allowed("python scripts/check.py; echo leaked")
+    assert not hook_guard.command_allowed("python scripts/check.py && python scripts/leaked.py")
+    assert not hook_guard.command_allowed("python scripts/../outside.py")
+    assert not hook_guard.command_allowed("python ../scripts/check.py")
+    assert not hook_guard.command_allowed(f"python {Path('scripts/check.py').resolve()}")
     assert not hook_guard.command_allowed("python -c 'print(1)'")
     assert not hook_guard.command_allowed("bash scripts/check.sh")
+
+
+def test_allowlisted_policy_command_runs_without_shell(monkeypatch) -> None:
+    calls: list[dict[str, object]] = []
+
+    def fake_run(argv: list[str], *, shell: bool, timeout: int, check: bool) -> subprocess.CompletedProcess[str]:
+        calls.append({"argv": argv, "shell": shell, "timeout": timeout, "check": check})
+        return subprocess.CompletedProcess(argv, 0)
+
+    monkeypatch.setattr(hook_guard.subprocess, "run", fake_run)
+    monkeypatch.setenv("CLAUDE_GOVERNANCE_COMMAND_TIMEOUT_SECONDS", "7")
+
+    assert hook_guard.run_command("python scripts/check.py --flag") == 0
+    assert calls == [
+        {"argv": ["python", "scripts/check.py", "--flag"], "shell": False, "timeout": 7, "check": False}
+    ]
 
 
 def test_non_allowlisted_policy_command_fails_strictly_by_default(monkeypatch) -> None:
     monkeypatch.delenv("CLAUDE_GOVERNANCE_STRICT_COMMANDS", raising=False)
     assert hook_guard.run_command("bash scripts/check.sh") == 2
+    assert hook_guard.run_command("python scripts/check.py && python scripts/leaked.py") == 2
 
     monkeypatch.setenv("CLAUDE_GOVERNANCE_STRICT_COMMANDS", "warn")
     assert hook_guard.run_command("bash scripts/check.sh") == 0
@@ -570,7 +846,11 @@ def test_optional_claude_cli_skip_is_machine_readable_json(tmp_path: Path) -> No
     proc = run_cli("behavior-test", "--repo", str(repo), env=env)
     assert proc.returncode == 0
     payload = json.loads(proc.stdout)
+    assert payload["schema_version"] == 1
     assert payload["status"] == "skipped"
+    assert payload["evaluator"] == "claude-cli"
+    assert payload["summary"] == {"passed": 0, "failed": 0, "skipped": 0}
+    assert payload["failed"] is False
     assert "PASS" not in proc.stdout
 
 
@@ -591,7 +871,9 @@ def test_optional_claude_cli_not_logged_in_is_skipped(tmp_path: Path) -> None:
     proc = run_cli("behavior-test", "--repo", str(repo), env=env)
     assert proc.returncode == 0
     payload = json.loads(proc.stdout)
+    assert payload["schema_version"] == 1
     assert payload["status"] == "skipped"
+    assert payload["summary"]["skipped"] == 1
     assert "not logged in" in payload["reason"].lower()
 
 

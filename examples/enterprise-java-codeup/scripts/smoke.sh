@@ -28,7 +28,7 @@ run_gov lint --repo "$tmp" --output "$score_file" --quiet
 run_gov verify --repo "$tmp"
 test ! -f "$tmp/.github/workflows/claude-md-governance.yml"
 test -f "$tmp/docs/ci/codeup-claude-md-governance.md"
-test -f "$tmp/src/main/java/example/payment/CLAUDE.md"
+test -f "$tmp/src/main/java/example/payment/AGENTS.md"
 config_mode="$("$py" -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["hooks"]["config_change_mode"])' "$tmp/.claude-governance/policy.json")"
 test "$config_mode" = "warn"
 score="$("$py" -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["score"])' "$score_file")"

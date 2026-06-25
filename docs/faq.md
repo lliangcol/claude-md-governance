@@ -18,8 +18,32 @@
 codex-md-governance init --repo . --preset generic --ci none --yes
 ```
 
-输出：不生成 GitHub 或 Codeup CI 文件。
+输出：不生成 GitHub、GitLab、Jenkins、Buildkite 或 Codeup CI 文件。
 失败处理：仍建议本地运行 `codex-md-governance verify --repo .`。
+
+## 如何只生成 GitLab pipeline？
+
+```bash
+codex-md-governance init --repo . --preset generic --ci gitlab --yes
+```
+
+失败处理：如果已有 `.gitlab-ci.yml` 未覆盖，加 `--force`。
+
+## 如何只生成 Jenkins pipeline？
+
+```bash
+codex-md-governance init --repo . --preset generic --ci jenkins --yes
+```
+
+失败处理：如果已有 `Jenkinsfile` 未覆盖，加 `--force`。
+
+## 如何只生成 Buildkite pipeline？
+
+```bash
+codex-md-governance init --repo . --preset generic --ci buildkite --yes
+```
+
+失败处理：如果已有 `.buildkite/pipeline.yml` 未覆盖，加 `--force`。
 
 ## 如何只生成 Codeup 示例？
 

@@ -30,7 +30,6 @@ except Exception:  # pragma: no cover - used by repository-local copied scripts.
         if not isinstance(value, list) or any(not _is_non_empty_string(item) for item in value):
             errors.append(f"{key} must be an array of non-empty strings")
 
-
     def _validate_root_doc(errors: List[str], value: object, key: str) -> None:
         if value is None:
             return
@@ -125,6 +124,7 @@ except Exception:  # pragma: no cover - used by repository-local copied scripts.
             errors.append("version must be a positive integer")
         if not _is_non_empty_string(policy.get("preset")):
             errors.append("preset must be a non-empty string")
+
         threshold = policy.get("score_threshold", 75)
         if not isinstance(threshold, int) or isinstance(threshold, bool) or not 0 <= threshold <= 100:
             errors.append("score_threshold must be an integer between 0 and 100")
@@ -220,6 +220,49 @@ def root_doc_path(policy: Dict) -> str:
     return "CLAUDE.md"
 
 
+def verify_posttool_rejects_non_allowlisted_command(policy: Dict, failures: List[str]) -> None:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_root = Path(temp_dir)
+        sentinel = temp_root / "policy-command-ran"
+        malicious_script = Path("scripts/.verify_allowlist_malicious.py")
+        allowed_script = Path("scripts/.verify_allowlist_allowed.py")
+        policy_path = temp_root / "policy.json"
+        command = f"python {malicious_script.as_posix()} && python {allowed_script.as_posix()}"
+        policy_copy = dict(policy)
+        policy_copy["sensitive_paths"] = [
+            {
+                "id": "verify-command-allowlist",
+                "path": "README.md",
+                "required_tests": [command],
+                "protected": False,
+            }
+        ]
+        policy_path.write_text(json.dumps(policy_copy, ensure_ascii=False), encoding="utf-8")
+        script_text = (
+            "from pathlib import Path\n"
+            f"Path({str(sentinel)!r}).write_text('ran', encoding='utf-8')\n"
+        )
+        try:
+            malicious_script.write_text(script_text, encoding="utf-8")
+            allowed_script.write_text(script_text, encoding="utf-8")
+            env = os.environ.copy()
+            env["CLAUDE_GOVERNANCE_POLICY"] = str(policy_path)
+            env["CLAUDE_GOVERNANCE_RUN_TESTS"] = "1"
+            event = json.dumps({"tool_input": {"file_path": "README.md"}})
+            proc = run([sys.executable, "scripts/claude_hook_guard.py", "post"], input_text=event, env=env)
+            output = proc.stdout + proc.stderr
+            assert_true(
+                proc.returncode == 2
+                and "rejected non-allowlisted policy command" in output
+                and not sentinel.exists(),
+                "PostToolUse rejects non-allowlisted policy command without execution",
+                failures,
+            )
+        finally:
+            malicious_script.unlink(missing_ok=True)
+            allowed_script.unlink(missing_ok=True)
+
+
 def explain_result(policy: Dict, failures: List[str], *, with_claude: bool) -> None:
     print("\nDiagnostic explanation:")
     if failures:
@@ -263,6 +306,12 @@ def main() -> int:
     ci_provider = policy.get("ci", {}).get("provider", "none")
     if ci_provider == "github":
         assert_true(Path(".github/workflows/claude-md-governance.yml").exists(), "GitHub Actions workflow exists", failures)
+    if ci_provider == "gitlab":
+        assert_true(Path(".gitlab-ci.yml").exists(), "GitLab CI pipeline exists", failures)
+    if ci_provider == "jenkins":
+        assert_true(Path("Jenkinsfile").exists(), "Jenkins pipeline exists", failures)
+    if ci_provider == "buildkite":
+        assert_true(Path(".buildkite/pipeline.yml").exists(), "Buildkite pipeline exists", failures)
     if ci_provider == "codeup":
         assert_true(Path("docs/ci/codeup-claude-md-governance.md").exists(), "Codeup CI instructions exist", failures)
 
@@ -276,14 +325,38 @@ def main() -> int:
     proc = run([sys.executable, "scripts/claude_hook_guard.py", "pre"], input_text=protected_event)
     assert_true(proc.returncode == 2, "PreToolUse blocks protected settings edit", failures)
 
+    malformed_event = run([sys.executable, "scripts/claude_hook_guard.py", "pre"], input_text="{bad json")
+    assert_true(malformed_event.returncode == 2, "PreToolUse rejects malformed hook JSON", failures)
+
+    nested_protected_event = json.dumps(
+        {"tool_input": {"edits": [{"file_path": "README.md"}, {"file_path": ".claude/settings.json"}]}}
+    )
+    proc_nested = run([sys.executable, "scripts/claude_hook_guard.py", "pre"], input_text=nested_protected_event)
+    assert_true(proc_nested.returncode == 2, "PreToolUse blocks nested protected settings edit", failures)
+
     env = os.environ.copy()
     env["CLAUDE_GOVERNANCE_APPROVED_PATHS"] = ".claude/settings.json"
     proc_allowed = run([sys.executable, "scripts/claude_hook_guard.py", "pre"], input_text=protected_event, env=env)
     assert_true(proc_allowed.returncode == 0, "PreToolUse allows protected edit when explicitly approved", failures)
 
+    with tempfile.TemporaryDirectory() as outside_dir:
+        outside_path = str(Path(outside_dir) / "outside.txt")
+        outside_event = json.dumps({"tool_input": {"file_path": outside_path}})
+        proc_outside = run([sys.executable, "scripts/claude_hook_guard.py", "pre"], input_text=outside_event)
+        assert_true(proc_outside.returncode == 2, "PreToolUse blocks outside-repo edit", failures)
+        outside_env = os.environ.copy()
+        outside_env["CLAUDE_GOVERNANCE_APPROVED_PATHS"] = outside_path
+        proc_outside_allowed = run(
+            [sys.executable, "scripts/claude_hook_guard.py", "pre"],
+            input_text=outside_event,
+            env=outside_env,
+        )
+        assert_true(proc_outside_allowed.returncode == 0, "PreToolUse allows outside-repo edit when explicitly approved", failures)
+
     unprotected_event = json.dumps({"tool_input": {"file_path": "README.md"}})
     proc_open = run([sys.executable, "scripts/claude_hook_guard.py", "pre"], input_text=unprotected_event)
     assert_true(proc_open.returncode == 0, "PreToolUse allows unprotected edit", failures)
+    verify_posttool_rejects_non_allowlisted_command(policy, failures)
 
     cfg_mode = config_change_mode(policy)
     cfg_event = json.dumps({"config_key": "model", "new_value": "example"})

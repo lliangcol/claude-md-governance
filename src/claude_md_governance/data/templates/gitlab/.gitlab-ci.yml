@@ -1,0 +1,27 @@
+stages:
+  - governance
+
+claude_md_governance:
+  stage: governance
+  image: python:3.11-slim
+  rules:
+    - changes:
+        - AGENTS.md
+        - "**/AGENTS.md"
+        - CLAUDE.md
+        - "**/CLAUDE.md"
+        - ".claude-governance/**/*"
+        - ".claude/**/*"
+        - ".codex/**/*"
+        - "scripts/claude_*"
+        - "scripts/verify_claude_governance.py"
+        - ".gitlab-ci.yml"
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  script:
+    - python scripts/claude_md_lint.py --policy .claude-governance/policy.json --output .claude-governance/score.json
+    - python scripts/verify_claude_governance.py
+  artifacts:
+    when: always
+    paths:
+      - .claude-governance/score.json
+    expire_in: 14 days

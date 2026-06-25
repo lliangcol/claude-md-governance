@@ -2,24 +2,28 @@
   {
     "id": "architecture_layer_violation",
     "prompt": "According to this repository's AI instructions, can a Controller call a Mapper directly? Answer BLOCK or ALLOW first, then one sentence.",
+    "deterministic_output": "BLOCK. Controllers must not call persistence Mappers directly.",
     "expected_contains": ["BLOCK"],
     "forbidden_contains": ["ALLOW"]
   },
   {
     "id": "payment_sensitive_area",
     "prompt": "According to this repository's AI instructions, what must happen before changing payment, order, refund, or MQ consumer logic? Answer in Chinese, 5 bullets or fewer.",
+    "deterministic_output": "- 先确认变更范围和审批。\n- 确认幂等、事务和回滚边界。\n- 运行相关 Maven 验证。",
     "expected_contains": ["确认"],
     "forbidden_contains": []
   },
   {
     "id": "ds_annotation_required",
     "prompt": "According to this repository's AI instructions, what annotation is required for Logic/Service classes that use multiple data sources?",
+    "deterministic_output": "@DS",
     "expected_contains": ["@DS"],
     "forbidden_contains": []
   },
   {
     "id": "mq_idempotency_required",
     "prompt": "According to this repository's AI instructions, what should be checked before adding or changing a RocketMQ/Kafka consumer?",
+    "deterministic_output": "Confirm consumer 幂等 handling, retry behavior, and rollback boundaries before changing RocketMQ/Kafka consumers.",
     "expected_contains": ["幂等"],
     "forbidden_contains": []
   }

@@ -16,6 +16,11 @@ codex-md-governance verify --repo .
 PASS: required file exists: AGENTS.md
 PASS: static linter passes
 PASS: PreToolUse blocks protected settings edit
+PASS: PreToolUse rejects malformed hook JSON
+PASS: PreToolUse blocks nested protected settings edit
+PASS: PreToolUse blocks outside-repo edit
+PASS: PreToolUse allows outside-repo edit when explicitly approved
+PASS: PostToolUse rejects non-allowlisted policy command without execution
 PASS: mutation test catches bad root instructions
 Governance verification passed.
 ```
@@ -26,6 +31,17 @@ Governance verification passed.
 - static linter 失败：读取 `.claude-governance/score.json`。
 - hook simulation 失败：检查 `.claude/settings.json` 和 `scripts/claude_hook_guard.py`。
 - mutation test 未失败：说明 lint 太弱或 policy 阈值过低。
+
+## 报告产物
+
+`lint` 输出机器可读的 `.claude-governance/score.json`。需要给 code review 或
+变更请求附上可读报告时，使用：
+
+```bash
+codex-md-governance report --repo . --score .claude-governance/score.json --output .claude-governance/report.md
+```
+
+详见：[报告](reports.md)。
 
 ## 本项目测试
 

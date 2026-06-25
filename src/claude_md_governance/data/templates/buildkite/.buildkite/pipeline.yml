@@ -1,0 +1,8 @@
+steps:
+  - label: ":white_check_mark: AGENTS.md Governance"
+    key: "agents-md-governance"
+    commands:
+      - "python scripts/claude_md_lint.py --policy .claude-governance/policy.json --output .claude-governance/score.json"
+      - "python scripts/verify_claude_governance.py"
+    artifact_paths:
+      - ".claude-governance/score.json"

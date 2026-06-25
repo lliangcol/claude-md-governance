@@ -16,6 +16,11 @@ Output:
 PASS: required file exists: AGENTS.md
 PASS: static linter passes
 PASS: PreToolUse blocks protected settings edit
+PASS: PreToolUse rejects malformed hook JSON
+PASS: PreToolUse blocks nested protected settings edit
+PASS: PreToolUse blocks outside-repo edit
+PASS: PreToolUse allows outside-repo edit when explicitly approved
+PASS: PostToolUse rejects non-allowlisted policy command without execution
 PASS: mutation test catches bad root instructions
 Governance verification passed.
 ```
@@ -26,6 +31,17 @@ Failure handling:
 - Static linter failure: read `.claude-governance/score.json`.
 - Hook simulation failure: check `.claude/settings.json` and `scripts/claude_hook_guard.py`.
 - Mutation test does not fail: lint is too weak or threshold is too low.
+
+## Report Artifacts
+
+`lint` writes the machine-readable `.claude-governance/score.json`. When a code
+review or change request needs a readable artifact, use:
+
+```bash
+codex-md-governance report --repo . --score .claude-governance/score.json --output .claude-governance/report.md
+```
+
+See [Reports](reports.md).
 
 ## Project tests
 

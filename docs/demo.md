@@ -29,13 +29,15 @@ bash scripts/demo_bad_repo.sh
 Expected behavior:
 
 - Generic demo copies `examples/generic-node-like`, runs `init`, `lint`, and
-  `verify`, installs `.github/workflows/claude-md-governance.yml`, and prints
-  `score=<n> PASS ...`.
+  `verify`, installs `.github/workflows/claude-md-governance.yml`, creates
+  `src/auth/AGENTS.md`, and prints `score=<n> PASS ...`.
 - enterprise-java-codeup demo copies `examples/enterprise-java-codeup`, runs `init`, `lint`,
   and `verify`, installs Codeup documentation, does not install GitHub Actions,
-  keeps `ConfigChange` in warning-only mode, and prints `score=<n> PASS ...`.
+  creates a payment-module `AGENTS.md`, keeps `ConfigChange` in warning-only
+  mode, and prints `score=<n> PASS ...`.
 - Bad repo demo copies `examples/bad-claude-md`, runs `init --skip-verify`,
-  then proves both `lint` and `verify` fail. It still writes
+  then proves both `lint` and `verify` fail against vague root `AGENTS.md`
+  rules. It still writes
   `.claude-governance/score.json` and prints `score=<n> PASS ...` when the
   expected failure is detected.
 
@@ -67,3 +69,6 @@ bash examples/java-maven-like/scripts/smoke.sh
 bash examples/enterprise-java-codeup/scripts/smoke.sh
 bash examples/bad-claude-md/scripts/smoke.sh
 ```
+
+The pytest suite also copies these fixtures and verifies the same pass/fail
+contract without requiring Bash.

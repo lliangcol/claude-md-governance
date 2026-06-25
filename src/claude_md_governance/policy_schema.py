@@ -154,8 +154,8 @@ def validate_policy(policy: Any) -> list[str]:
             errors.append("ci must be an object")
         else:
             provider = ci.get("provider")
-            if provider is not None and provider not in {"auto", "github", "codeup", "none"}:
-                errors.append("ci.provider must be one of: auto, github, codeup, none")
+            if provider is not None and provider not in {"auto", "github", "gitlab", "jenkins", "buildkite", "codeup", "none"}:
+                errors.append("ci.provider must be one of: auto, github, gitlab, jenkins, buildkite, codeup, none")
 
     behavior = policy.get("behavior_tests")
     if behavior is not None:

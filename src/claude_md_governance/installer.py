@@ -27,7 +27,15 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List
 
 from .hooks import desired_hooks, merge_hook_settings
-from .policy_schema import PolicyValidationError, load_policy_file, validate_policy
+from .policy import (
+    PolicyValidationError,
+    load_policy_file,
+    merge_policy_defaults,
+    normalize_policy_for_template_merge,
+    root_doc_name,
+    root_doc_rel,
+    validate_policy,
+)
 
 KIT_ROOT = Path(__file__).resolve().parent
 TEMPLATE_ROOT = KIT_ROOT / "data" / "templates"
@@ -90,50 +98,6 @@ def write_json(path: Path, data: Dict[str, Any]) -> None:
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
-def root_doc_policy(policy: Dict[str, Any]) -> Dict[str, Any]:
-    for key in ("root_doc", "root_agents", "root_claude"):
-        value = policy.get(key)
-        if isinstance(value, dict):
-            return value
-    return {}
-
-
-def root_doc_rel(policy: Dict[str, Any]) -> Path:
-    return Path(str(root_doc_policy(policy).get("path", "CLAUDE.md")))
-
-
-def root_doc_name(policy: Dict[str, Any]) -> str:
-    return root_doc_rel(policy).name
-
-
-def merge_policy_defaults(existing: Any, defaults: Any) -> Any:
-    if isinstance(existing, dict) and isinstance(defaults, dict):
-        merged = dict(existing)
-        for key, value in defaults.items():
-            merged[key] = merge_policy_defaults(merged[key], value) if key in merged else value
-        return merged
-    if isinstance(existing, list) and isinstance(defaults, list):
-        merged_list = list(existing)
-        seen = {policy_list_identity(item) for item in merged_list}
-        for item in defaults:
-            identity = policy_list_identity(item)
-            if identity not in seen:
-                merged_list.append(item)
-                seen.add(identity)
-        return merged_list
-    return existing
-
-
-def policy_list_identity(item: Any) -> str:
-    if isinstance(item, dict):
-        for key in ("id", "name", "path"):
-            value = item.get(key)
-            if value:
-                return f"{key}:{value}"
-        return json.dumps(item, ensure_ascii=False, sort_keys=True)
-    return str(item)
-
-
 def git_remote(repo: Path) -> str:
     try:
         proc = subprocess.run(["git", "remote", "-v"], cwd=repo, text=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
@@ -159,6 +123,12 @@ def detect_ci(repo: Path, requested: str, preset: str) -> str:
     remote = git_remote(repo)
     if "codeup.aliyun" in remote or preset == "enterprise-java-codeup":
         return "codeup"
+    if (repo / "Jenkinsfile").exists():
+        return "jenkins"
+    if (repo / ".buildkite" / "pipeline.yml").exists():
+        return "buildkite"
+    if "gitlab." in remote or "gitlab.com" in remote or (repo / ".gitlab-ci.yml").exists():
+        return "gitlab"
     if "github.com" in remote or (repo / ".github").exists():
         return "github"
     return "none"
@@ -470,7 +440,7 @@ def install_policy(repo: Path, policy: Dict[str, Any], backup_root: Path, force:
     if dst.exists() and not force:
         # Merge non-destructively: keep existing user choices, but add missing versioned defaults.
         backup(repo, Path(".claude-governance/policy.json"), backup_root)
-        existing = read_json(dst)
+        existing = normalize_policy_for_template_merge(read_json(dst))
         merged = merge_policy_defaults(existing, policy)
         merged.setdefault("hooks", {}).setdefault("config_change_mode", config_mode)
         merged.setdefault("ci", {}).setdefault("provider", ci)
@@ -502,6 +472,12 @@ def copy_ci(repo: Path, backup_root: Path, force: bool, ci: str) -> None:
             copy_tree_files(TEMPLATE_ROOT / "github", repo, backup_root, force=force)
     elif ci == "codeup":
         copy_tree_files(TEMPLATE_ROOT / "codeup", repo, backup_root, force=force)
+    elif ci == "gitlab":
+        copy_tree_files(TEMPLATE_ROOT / "gitlab", repo, backup_root, force=force)
+    elif ci == "jenkins":
+        copy_tree_files(TEMPLATE_ROOT / "jenkins", repo, backup_root, force=force)
+    elif ci == "buildkite":
+        copy_tree_files(TEMPLATE_ROOT / "buildkite", repo, backup_root, force=force)
 
 
 def chmod_scripts(repo: Path) -> None:
@@ -526,7 +502,11 @@ def main() -> int:
     parser.add_argument("--force", action="store_true", help="Overwrite starter-kit managed files after backup")
     parser.add_argument("--skip-verify", action="store_true")
     parser.add_argument("--preset", default="auto", choices=["auto", "generic", "java-maven", "enterprise-java-codeup"])
-    parser.add_argument("--ci", default="auto", choices=["auto", "github", "codeup", "none"])
+    parser.add_argument(
+        "--ci",
+        default="auto",
+        choices=["auto", "github", "gitlab", "jenkins", "buildkite", "codeup", "none"],
+    )
     parser.add_argument("--config-change-mode", default="auto", choices=["auto", "block", "warn", "off"])
     args = parser.parse_args()
 

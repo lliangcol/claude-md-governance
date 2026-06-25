@@ -4,7 +4,7 @@
 
 ## 适用场景
 
-`java-maven` 适合 Maven 多模块或单模块 Java 仓库。它提供 Java/Maven 阈值和敏感目录匹配，但不默认绑定 GitHub 或 Codeup。
+`java-maven` 适合 Maven 多模块或单模块 Java 仓库。它提供 Java/Maven 阈值和敏感目录匹配，但不默认绑定 GitHub、GitLab、Jenkins、Buildkite 或 Codeup。
 
 ## 安装
 

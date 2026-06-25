@@ -64,7 +64,7 @@
     "ci": {
       "type": "object",
       "properties": {
-        "provider": {"type": "string", "enum": ["auto", "github", "codeup", "none"]}
+        "provider": {"type": "string", "enum": ["auto", "github", "gitlab", "jenkins", "buildkite", "codeup", "none"]}
       },
       "additionalProperties": true
     },

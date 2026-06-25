@@ -17,7 +17,7 @@ policy 文件路径：`.claude-governance/policy.json`。
 - `sensitive_paths`：敏感路径、本地 `AGENTS.md`/`CLAUDE.md`、测试命令和保护标记。
 - `protected_paths`：`PreToolUse` 默认保护的路径。
 - `hooks`：hook 需求和 `config_change_mode`。
-- `ci`：`provider` 为 `auto`、`github`、`codeup` 或 `none`。
+- `ci`：`provider` 为 `auto`、`github`、`gitlab`、`jenkins`、`buildkite`、`codeup` 或 `none`。
 - `behavior_tests`：可选行为测试配置。
 
 ## 命令
@@ -42,13 +42,20 @@ codex-md-governance policy validate --repo . --policy .claude-governance/policy.
 codex-md-governance policy migrate --repo . --policy .claude-governance/policy.json --write
 ```
 
-`migrate` 只补齐可机械推导的字段，例如 `root_doc`、`hooks.config_change_mode` 和 `ci.provider`；无法推导的字段仍应由维护者显式编辑。
+查看 hook policy 命令 allowlist：
+
+```bash
+codex-md-governance policy command-allowlist
+```
+
+`migrate` 只补齐可机械推导的字段，例如 `root_doc`、`hooks.config_change_mode` 和 `ci.provider`；无法推导的字段仍应由维护者显式编辑。`init` 合并既有 policy 时也会先按同样的 root-doc 兼容语义保留 `root_agents` / `root_claude`，避免旧 `CLAUDE.md` 仓库被静默切换到新模板默认的 `AGENTS.md`。
 
 失败处理：
 
 - `ROOT_MISSING`：创建根 `AGENTS.md` 或 policy 指定的 root instruction file。
 - `MISSING_SECTION`：添加必需章节或可接受别名。
 - `MISSING_LOCAL_DOC`：为敏感目录创建本地 `AGENTS.md`/`CLAUDE.md`。
+- `ROOT_LOCAL_DOC_CONFLICT`：将本地规则路径改为敏感目录下的 `AGENTS.md`/`CLAUDE.md`；不能让 local instruction file 解析到 root instruction file。
 - `BANNED_DEP_PRESENT`：从 dependency file 移除 policy 禁用依赖，或显式调整 policy。
 - `PRE_HOOK_MISSING` / `POST_HOOK_MISSING`：修复 `.claude/settings.json`。
 

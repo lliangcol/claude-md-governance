@@ -18,8 +18,32 @@ Yes:
 codex-md-governance init --repo . --preset generic --ci none --yes
 ```
 
-Output: no GitHub or Codeup CI files.
+Output: no GitHub, GitLab, Jenkins, Buildkite, or Codeup CI files.
 Failure handling: still run `codex-md-governance verify --repo .` locally.
+
+## How do I generate only a GitLab pipeline?
+
+```bash
+codex-md-governance init --repo . --preset generic --ci gitlab --yes
+```
+
+Failure handling: use `--force` if an existing `.gitlab-ci.yml` should be overwritten.
+
+## How do I generate only a Jenkins pipeline?
+
+```bash
+codex-md-governance init --repo . --preset generic --ci jenkins --yes
+```
+
+Failure handling: use `--force` if an existing `Jenkinsfile` should be overwritten.
+
+## How do I generate only a Buildkite pipeline?
+
+```bash
+codex-md-governance init --repo . --preset generic --ci buildkite --yes
+```
+
+Failure handling: use `--force` if an existing `.buildkite/pipeline.yml` should be overwritten.
 
 ## How do I generate only a Codeup example?
 

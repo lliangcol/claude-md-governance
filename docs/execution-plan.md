@@ -52,6 +52,9 @@ Supported presets:
 Supported CI modes:
 
 - `github`: install GitHub Actions workflow.
+- `gitlab`: install GitLab CI pipeline.
+- `jenkins`: install Jenkins pipeline.
+- `buildkite`: install Buildkite pipeline.
 - `codeup`: install Codeup step and documentation.
 - `none`: install no CI files.
 - `auto`: infer from remote and preset.

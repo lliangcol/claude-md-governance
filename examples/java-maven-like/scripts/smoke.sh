@@ -27,5 +27,6 @@ run_gov init --repo "$tmp" --preset java-maven --ci none --yes
 run_gov lint --repo "$tmp" --output "$score_file" --quiet
 run_gov verify --repo "$tmp"
 test ! -f "$tmp/.github/workflows/claude-md-governance.yml"
+test -f "$tmp/src/main/java/example/order/AGENTS.md"
 score="$("$py" -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["score"])' "$score_file")"
 echo "score=$score PASS java-maven-like smoke: $tmp"

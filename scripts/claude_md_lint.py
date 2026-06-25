@@ -165,6 +165,15 @@ def normalize(path: str) -> str:
     return normalized[2:] if normalized.startswith("./") else normalized
 
 
+def path_identity(repo: Path, path: Path | str) -> str:
+    candidate = Path(path)
+    absolute = candidate if candidate.is_absolute() else repo / candidate
+    try:
+        return absolute.resolve().relative_to(repo.resolve()).as_posix()
+    except ValueError:
+        return absolute.resolve().as_posix()
+
+
 def line_number_for(text: str, needle: str) -> int:
     idx = text.lower().find(needle.lower())
     return 0 if idx < 0 else text[:idx].count("\n") + 1
@@ -392,6 +401,7 @@ def lint(repo: Path, policy: Dict[str, Any], claude_path: Path) -> Dict[str, Any
     detected_sensitive_dirs: List[Dict[str, str]] = []
     doc_name = root_doc_name(policy)
     repo_index = build_repo_index(repo)
+    root_doc_identity = path_identity(repo, claude_path)
 
     text = read_text(claude_path)
     if not text:
@@ -506,6 +516,18 @@ def lint(repo: Path, policy: Dict[str, Any], claude_path: Path) -> Dict[str, Any
         for d in dirs:
             local_rel = local_path_for(item, d, doc_name)
             detected_sensitive_dirs.append({"id": str(item.get("id", "")), "dir": d, "local_doc": local_rel})
+            if path_identity(repo, local_rel) == root_doc_identity:
+                add_finding(
+                    findings,
+                    rule="ROOT_LOCAL_DOC_CONFLICT",
+                    severity="error",
+                    message=f"Sensitive path local instruction resolves to the root instruction file: {local_rel}",
+                    deduction=10,
+                    suggestion="Configure a path-scoped local AGENTS.md/CLAUDE.md under the sensitive directory.",
+                )
+                hard_fail = True
+                score -= 10
+                continue
             if not (repo / local_rel).exists():
                 add_finding(findings, rule="MISSING_LOCAL_DOC", severity="error", message=f"Sensitive path exists but local instruction file is missing: {local_rel}", deduction=10, suggestion=f"Create local {Path(local_rel).name} with safety boundaries and required checks.")
                 hard_fail = True

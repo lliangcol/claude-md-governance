@@ -17,7 +17,7 @@ Policy path: `.claude-governance/policy.json`.
 - `sensitive_paths`: sensitive path patterns, local `AGENTS.md`/`CLAUDE.md`, test commands, and protection flag.
 - `protected_paths`: paths guarded by `PreToolUse`.
 - `hooks`: hook requirements and `config_change_mode`.
-- `ci`: provider: `auto`, `github`, `codeup`, or `none`.
+- `ci`: provider: `auto`, `github`, `gitlab`, `jenkins`, `buildkite`, `codeup`, or `none`.
 - `behavior_tests`: optional behavior test configuration.
 
 ## Command
@@ -42,13 +42,20 @@ Conservatively migrate an older policy shape:
 codex-md-governance policy migrate --repo . --policy .claude-governance/policy.json --write
 ```
 
-`migrate` only fills mechanically derivable fields such as `root_doc`, `hooks.config_change_mode`, and `ci.provider`; maintainers should still edit fields that require project knowledge.
+Inspect the hook policy command allowlist:
+
+```bash
+codex-md-governance policy command-allowlist
+```
+
+`migrate` only fills mechanically derivable fields such as `root_doc`, `hooks.config_change_mode`, and `ci.provider`; maintainers should still edit fields that require project knowledge. When `init` merges an existing policy, it applies the same root-doc compatibility rule first so legacy `CLAUDE.md` repositories are not silently switched to the new-template default `AGENTS.md`.
 
 Failure handling:
 
 - `ROOT_MISSING`: create root `AGENTS.md` or the root instruction file configured by policy.
 - `MISSING_SECTION`: add the required heading or an accepted alias.
 - `MISSING_LOCAL_DOC`: create local `AGENTS.md`/`CLAUDE.md` rules for the sensitive directory.
+- `ROOT_LOCAL_DOC_CONFLICT`: move the local rule path under the sensitive directory; the local instruction file must not resolve to the root instruction file.
 - `BANNED_DEP_PRESENT`: remove the policy-banned dependency from dependency files or explicitly update policy.
 - `PRE_HOOK_MISSING` / `POST_HOOK_MISSING`: repair `.claude/settings.json`.
 

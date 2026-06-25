@@ -1,8 +1,8 @@
 # enterprise-java-codeup Example
 
-Blank starting state: this fixture intentionally has no `CLAUDE.md`. The
-payment-like module should be detected as sensitive and receive a local
-`CLAUDE.md`.
+Blank starting state: this fixture intentionally has no root `AGENTS.md` or
+`CLAUDE.md`. The payment-like module should be detected as sensitive and
+receive a local `AGENTS.md`.
 
 Expected:
 

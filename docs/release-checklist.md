@@ -33,6 +33,9 @@ python -m twine check dist/*.whl dist/*.tar.gz
 python scripts/wheel_smoke.py --wheel dist/claude_md_governance-0.1.0-py3-none-any.whl
 ```
 
+This smoke checks required package data for policy schema, behavior cases,
+common scripts, all CI provider templates, and both console entry points.
+
 - [ ] GitHub Release asset upload is enabled in `.github/workflows/release.yml`.
 - [ ] CodeQL is enabled through `.github/workflows/codeql.yml`.
 - [ ] The release page contains the wheel, sdist, and `sbom.cdx.json` assets after the tag workflow finishes.

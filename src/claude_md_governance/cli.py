@@ -34,9 +34,11 @@ def _print_eval_command(argv: Sequence[str]) -> int:
 
 
 def _default_prog() -> str:
-    name = Path(sys.argv[0]).name
-    if name in {"codex-md-governance", "codex-md-governance.exe", "claude-md-governance", "claude-md-governance.exe"}:
-        return name
+    name = Path(sys.argv[0]).name.lower()
+    if name in {"codex-md-governance", "codex-md-governance.exe"}:
+        return "codex-md-governance"
+    if name in {"claude-md-governance", "claude-md-governance.exe"}:
+        return "claude-md-governance"
     return "codex-md-governance"
 
 
@@ -54,7 +56,11 @@ def build_parser() -> argparse.ArgumentParser:
     init_cmd.add_argument("--force", action="store_true", help="Overwrite managed files after backup.")
     init_cmd.add_argument("--skip-verify", action="store_true")
     init_cmd.add_argument("--preset", default="generic", choices=["auto", "generic", "java-maven", "enterprise-java-codeup"])
-    init_cmd.add_argument("--ci", default="auto", choices=["auto", "github", "codeup", "none"])
+    init_cmd.add_argument(
+        "--ci",
+        default="auto",
+        choices=["auto", "github", "gitlab", "jenkins", "buildkite", "codeup", "none"],
+    )
     init_cmd.add_argument("--config-change-mode", default="auto", choices=["auto", "block", "warn", "off"])
 
     lint_cmd = sub.add_parser("lint", help="Run deterministic root instruction scoring.")
@@ -65,6 +71,12 @@ def build_parser() -> argparse.ArgumentParser:
     lint_cmd.add_argument("--output", default=None)
     lint_cmd.add_argument("--fail-under", type=int, default=None)
     lint_cmd.add_argument("--quiet", action="store_true")
+
+    report_cmd = sub.add_parser("report", help="Render lint score JSON as a review-friendly report.")
+    report_cmd.add_argument("--repo", default=".")
+    report_cmd.add_argument("--score", default=".claude-governance/score.json")
+    report_cmd.add_argument("--output", default=None)
+    report_cmd.add_argument("--format", default="markdown", choices=["markdown"])
 
     autofix_cmd = sub.add_parser("autofix", help="Apply conservative repair actions.")
     autofix_cmd.add_argument("--repo", default=".")
@@ -91,6 +103,7 @@ def build_parser() -> argparse.ArgumentParser:
     behavior_cmd = sub.add_parser("behavior-test", help="Run optional Claude CLI behavior tests.")
     behavior_cmd.add_argument("--repo", default=".")
     behavior_cmd.add_argument("--cases", default="tests/ai_behavior_cases.json")
+    behavior_cmd.add_argument("--evaluator", default="claude-cli", choices=["claude-cli", "deterministic"])
     behavior_cmd.add_argument("--timeout", type=int, default=120)
     behavior_cmd.add_argument("--require-claude", action="store_true")
 
@@ -100,7 +113,7 @@ def build_parser() -> argparse.ArgumentParser:
     doctor_cmd.add_argument("--require-claude", action="store_true")
     doctor_cmd.add_argument("--explain", action="store_true")
 
-    policy_cmd = sub.add_parser("policy", help="Validate or migrate policy JSON.")
+    policy_cmd = sub.add_parser("policy", help="Inspect, validate, or migrate policy JSON.")
     policy_sub = policy_cmd.add_subparsers(dest="policy_command", required=True)
     policy_validate = policy_sub.add_parser("validate", help="Validate policy JSON.")
     policy_validate.add_argument("--repo", default=".")
@@ -109,6 +122,7 @@ def build_parser() -> argparse.ArgumentParser:
     policy_migrate.add_argument("--repo", default=".")
     policy_migrate.add_argument("--policy", default=".claude-governance/policy.json")
     policy_migrate.add_argument("--write", action="store_true")
+    policy_sub.add_parser("command-allowlist", help="Print hook policy command allowlist JSON.")
     return parser
 
 
@@ -129,6 +143,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _dispatch("installer", forwarded)
     if command == "lint":
         return _dispatch("lint", forwarded)
+    if command == "report":
+        return _dispatch("report", forwarded)
     if command == "autofix":
         forwarded = [arg for arg in forwarded if arg != "--apply"]
         return _dispatch("autofix", forwarded)

@@ -14,7 +14,7 @@ Make Claude Code repo rules enforceable with policy-as-code, hooks, and CI.
 - `Do NOT introduce` rule enforcement.
 - Local AGENTS.md for sensitive modules.
 - PreToolUse and PostToolUse hook guard.
-- GitHub, Codeup, and local-only modes.
+- GitHub, GitLab, Jenkins, Buildkite, Codeup, and local-only modes.
 - Generic, Java/Maven, and enterprise-java-codeup presets.
 
 ## CTA

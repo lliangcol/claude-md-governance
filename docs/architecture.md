@@ -6,11 +6,12 @@
 
 - `src/claude_md_governance/cli.py`：统一 CLI 入口。
 - `installer.py`：安装 common 模板、policy、hook settings 和 CI 模板。
+- `policy.py`：package 内 policy 路径解析、root-doc 兼容迁移和默认值合并入口。
 - `lint.py`：确定性评分器。
 - `hook_guard.py`：Claude Code hook guard。
 - `verify.py`：安装后 smoke verification。
 - `behavior.py`：可选 Claude CLI 行为测试。
-- `data/templates/`：common、github、codeup 和 policies 模板。
+- `data/templates/`：common、github、gitlab、jenkins、buildkite、codeup 和 policies 模板。
 
 ## 数据流
 

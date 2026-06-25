@@ -13,6 +13,7 @@ from pathlib import Path
 
 
 REQUIRED_WHEEL_PATHS = [
+    "claude_md_governance/data/schemas/policy.schema.json",
     "claude_md_governance/data/templates/policies/generic.json",
     "claude_md_governance/data/templates/policies/java-maven.json",
     "claude_md_governance/data/templates/policies/enterprise-java-codeup.json",
@@ -21,8 +22,21 @@ REQUIRED_WHEEL_PATHS = [
     "claude_md_governance/data/templates/common/.codex/hooks.json",
     "claude_md_governance/data/templates/common/scripts/claude_md_lint.py",
     "claude_md_governance/data/templates/common/scripts/claude_hook_guard.py",
+    "claude_md_governance/data/templates/common/scripts/claude_md_autofix.py",
     "claude_md_governance/data/templates/common/scripts/verify_claude_governance.py",
+    "claude_md_governance/data/templates/common/scripts/build_claude_md_eval_prompt.py",
+    "claude_md_governance/data/templates/common/scripts/run_ai_behavior_tests.py",
+    "claude_md_governance/data/templates/common/tests/ai_behavior_cases.json",
+    "claude_md_governance/data/templates/common/tests/ai_behavior_cases.enterprise-java-codeup.json",
     "claude_md_governance/data/templates/github/workflows/claude-md-governance.yml",
+    "claude_md_governance/data/templates/codeup/ci/codeup/claude-md-governance-step.yml",
+    "claude_md_governance/data/templates/codeup/docs/ci/codeup-claude-md-governance.md",
+    "claude_md_governance/data/templates/gitlab/.gitlab-ci.yml",
+    "claude_md_governance/data/templates/gitlab/docs/ci/gitlab-claude-md-governance.md",
+    "claude_md_governance/data/templates/jenkins/Jenkinsfile",
+    "claude_md_governance/data/templates/jenkins/docs/ci/jenkins-claude-md-governance.md",
+    "claude_md_governance/data/templates/buildkite/.buildkite/pipeline.yml",
+    "claude_md_governance/data/templates/buildkite/docs/ci/buildkite-claude-md-governance.md",
 ]
 
 CACHE_MARKERS = (
@@ -64,6 +78,12 @@ def venv_python(venv: Path) -> Path:
     if sys.platform == "win32":
         return venv / "Scripts" / "python.exe"
     return venv / "bin" / "python"
+
+
+def venv_script(venv: Path, name: str) -> Path:
+    if sys.platform == "win32":
+        return venv / "Scripts" / f"{name}.exe"
+    return venv / "bin" / name
 
 
 def assert_wheel_contents(wheel: Path) -> None:
@@ -109,13 +129,15 @@ def main() -> int:
 
         run([sys.executable, "-m", "venv", str(venv)])
         py = venv_python(venv)
+        codex = venv_script(venv, "codex-md-governance")
+        legacy = venv_script(venv, "claude-md-governance")
         run([str(py), "-m", "pip", "install", str(wheel)])
         run([str(py), "-m", "claude_md_governance", "--help"])
+        run([str(codex), "--version"])
+        run([str(legacy), "--version"])
         run(
             [
-                str(py),
-                "-m",
-                "claude_md_governance",
+                str(codex),
                 "init",
                 "--repo",
                 str(repo),
@@ -126,7 +148,8 @@ def main() -> int:
                 "--yes",
             ]
         )
-        run([str(py), "-m", "claude_md_governance", "verify", "--repo", str(repo)])
+        run([str(codex), "verify", "--repo", str(repo)])
+        run([str(legacy), "policy", "validate", "--repo", str(repo)])
 
         required_generated = [
             repo / "AGENTS.md",

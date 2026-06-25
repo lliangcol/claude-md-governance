@@ -1,8 +1,8 @@
 # Generic Node-like Example
 
-Blank starting state: this fixture intentionally has no `CLAUDE.md`. The
-installer should create root governance files and a local rule file for
-`src/auth`.
+Blank starting state: this fixture intentionally has no root `AGENTS.md` or
+`CLAUDE.md`. The installer should create root governance files and a local
+`AGENTS.md` rule file for `src/auth`.
 
 Expected:
 

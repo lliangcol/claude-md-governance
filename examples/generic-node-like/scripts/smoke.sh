@@ -27,6 +27,6 @@ run_gov init --repo "$tmp" --preset generic --ci github --yes
 run_gov lint --repo "$tmp" --output "$score_file" --quiet
 run_gov verify --repo "$tmp"
 test -f "$tmp/.github/workflows/claude-md-governance.yml"
-test -f "$tmp/src/auth/CLAUDE.md"
+test -f "$tmp/src/auth/AGENTS.md"
 score="$("$py" -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["score"])' "$score_file")"
 echo "score=$score PASS generic-node-like smoke: $tmp"

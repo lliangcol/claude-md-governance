@@ -6,9 +6,9 @@
 
 - Python CLI: `claude-md-governance`.
 - Presets: `generic`, `java-maven`, `enterprise-java-codeup`.
-- CI modes: `github`, `codeup`, `none`, and conservative `auto` detection.
+- CI modes: `github`, `gitlab`, `jenkins`, `buildkite`, `codeup`, `none`, and conservative `auto` detection.
 - Deterministic commands: `init`, `lint`, `autofix`, `hook`, `verify`, `eval`, `behavior-test`, and `doctor`.
-- Package-managed templates for policy files, Claude Code hooks, governance scripts, GitHub Actions, Codeup docs, and the Claude Code skill.
+- Package-managed templates for policy files, Claude Code hooks, governance scripts, GitHub Actions, GitLab CI, Jenkins, Buildkite, Codeup docs, and the Claude Code skill.
 
 ## Verified Commands
 
