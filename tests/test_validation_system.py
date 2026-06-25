@@ -191,14 +191,21 @@ def test_policy_schema_rejects_invalid_field_types(tmp_path: Path) -> None:
     repo = make_repo(tmp_path, "invalid-policy-types")
     assert install(repo).returncode == 0
     policy = json.loads((repo / ".claude-governance" / "policy.json").read_text(encoding="utf-8"))
+    policy["score_threshold"] = True
     policy["hooks"]["config_change_mode"] = "silent"
     policy["protected_paths"] = [123]
     (repo / ".claude-governance" / "policy.json").write_text(json.dumps(policy), encoding="utf-8")
 
     proc = run_cli("lint", "--repo", str(repo), "--quiet")
     assert proc.returncode == 2
+    assert "score_threshold" in proc.stderr
     assert "hooks.config_change_mode" in proc.stderr
     assert "protected_paths" in proc.stderr
+
+    verify_proc = run_cli("verify", "--repo", str(repo))
+    assert verify_proc.returncode == 1
+    assert "policy schema validates" in verify_proc.stdout
+    assert "score_threshold" in verify_proc.stderr
 
 
 def test_policy_validate_and_migrate_commands(tmp_path: Path) -> None:
