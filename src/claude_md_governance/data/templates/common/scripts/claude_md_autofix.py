@@ -8,14 +8,103 @@ invents project-specific business rules or banned dependencies.
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import fnmatch
 import json
 import os
 import re
 import shutil
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List
+
+PolicyValidationError: Any
+load_policy_file: Any
+
+try:
+    from claude_md_governance.policy_schema import PolicyValidationError as _PolicyValidationError
+    from claude_md_governance.policy_schema import load_policy_file as _load_policy_file
+
+    PolicyValidationError = _PolicyValidationError
+    load_policy_file = _load_policy_file
+except Exception:  # pragma: no cover - used by repository-local copied scripts.
+    def _load_sibling_policy_loader() -> tuple[type[ValueError], Any]:
+        lint_script = Path(__file__).with_name("claude_md_lint.py")
+        if not lint_script.exists():
+            raise ImportError("sibling claude_md_lint.py not found")
+        spec = importlib.util.spec_from_file_location("claude_md_autofix_lint_schema", lint_script)
+        if spec is None or spec.loader is None:
+            raise ImportError("cannot load sibling claude_md_lint.py")
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        return module.PolicyValidationError, module.load_policy_file
+
+    try:
+        PolicyValidationError, load_policy_file = _load_sibling_policy_loader()
+    except Exception:
+        class PolicyValidationError(ValueError):  # type: ignore[no-redef]
+            def __init__(self, path: Path, errors: List[str]) -> None:
+                self.path = path
+                self.errors = tuple(errors)
+                super().__init__(f"Invalid policy file {path}: {'; '.join(errors)}")
+
+        def _is_non_empty_string(value: Any) -> bool:
+            return isinstance(value, str) and bool(value.strip())
+
+        def _validate_string_list(errors: List[str], value: Any, key: str) -> None:
+            if value is None:
+                return
+            if not isinstance(value, list) or any(not _is_non_empty_string(item) for item in value):
+                errors.append(f"{key} must be an array of non-empty strings")
+
+        def _validate_policy(policy: Any) -> List[str]:
+            if not isinstance(policy, dict):
+                return ["policy root must be a JSON object"]
+            errors: List[str] = []
+            version = policy.get("version")
+            if not isinstance(version, int) or isinstance(version, bool) or version < 1:
+                errors.append("version must be a positive integer")
+            if not _is_non_empty_string(policy.get("preset")):
+                errors.append("preset must be a non-empty string")
+            hooks = policy.get("hooks")
+            if not isinstance(hooks, dict):
+                errors.append("hooks must be an object")
+            else:
+                if "config_change_mode" not in hooks:
+                    errors.append("hooks.config_change_mode is required")
+                mode = hooks.get("config_change_mode", "block")
+                if mode not in {"block", "warn", "off"}:
+                    errors.append("hooks.config_change_mode must be one of: block, warn, off")
+            _validate_string_list(errors, policy.get("protected_paths", []), "protected_paths")
+            sensitive = policy.get("sensitive_paths", [])
+            if not isinstance(sensitive, list):
+                errors.append("sensitive_paths must be an array")
+            else:
+                for index, item in enumerate(sensitive):
+                    item_path = f"sensitive_paths[{index}]"
+                    if not isinstance(item, dict):
+                        errors.append(f"{item_path} must be an object")
+                        continue
+                    if not _is_non_empty_string(item.get("path")):
+                        errors.append(f"{item_path}.path must be a non-empty string")
+                    _validate_string_list(errors, item.get("required_tests", []), f"{item_path}.required_tests")
+                    if "protected" in item and not isinstance(item.get("protected"), bool):
+                        errors.append(f"{item_path}.protected must be a boolean")
+            return errors
+
+        def load_policy_file(path: Path) -> Dict[str, Any]:
+            if not path.exists():
+                raise PolicyValidationError(path, ["policy file is missing"])
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError as exc:
+                raise PolicyValidationError(path, [f"invalid JSON at line {exc.lineno}, column {exc.colno}: {exc.msg}"]) from exc
+            errors = _validate_policy(data)
+            if errors:
+                raise PolicyValidationError(path, errors)
+            return data
 
 try:
     from claude_md_governance.hooks import desired_hooks, merge_hook_settings
@@ -408,7 +497,12 @@ def main() -> int:
     parser.add_argument("--apply", action="store_true", help="Apply repairs. This is the default unless --dry-run is set.")
     args = parser.parse_args()
     repo = Path(args.repo).resolve()
-    policy = read_json(repo / args.policy)
+    policy_path = repo / args.policy
+    try:
+        policy = load_policy_file(policy_path)
+    except PolicyValidationError as exc:
+        print(f"[claude-governance] {exc}", file=sys.stderr)
+        return 2
     actions = apply(repo, policy, args.dry_run)
     print(json.dumps({"dry_run": args.dry_run, "actions": actions}, ensure_ascii=False, indent=2))
     return 0

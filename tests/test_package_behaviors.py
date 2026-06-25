@@ -309,6 +309,24 @@ def test_autofix_repairs_current_repo_without_score_file(tmp_path: Path) -> None
     assert "PostToolUse" in settings["hooks"]
 
 
+def test_autofix_rejects_missing_or_invalid_policy_without_writes(tmp_path: Path) -> None:
+    missing_repo = make_repo(tmp_path, "missing-policy")
+    missing = run_cli("autofix", "--repo", str(missing_repo), "--apply")
+    assert missing.returncode == 2
+    assert "policy file is missing" in missing.stderr
+    assert not (missing_repo / "CLAUDE.md").exists()
+    assert not (missing_repo / ".claude" / "settings.json").exists()
+
+    invalid_repo = make_repo(tmp_path, "invalid-policy")
+    (invalid_repo / ".claude-governance").mkdir()
+    (invalid_repo / ".claude-governance" / "policy.json").write_text("{bad json", encoding="utf-8")
+    invalid = run_cli("autofix", "--repo", str(invalid_repo), "--apply")
+    assert invalid.returncode == 2
+    assert "invalid JSON" in invalid.stderr
+    assert not (invalid_repo / "CLAUDE.md").exists()
+    assert not (invalid_repo / ".claude" / "settings.json").exists()
+
+
 def test_codeup_init_does_not_create_github_actions(tmp_path: Path) -> None:
     repo = make_repo(tmp_path, "codeup")
     proc = run_cli("init", "--repo", str(repo), "--preset", "enterprise-java-codeup", "--ci", "codeup", "--config-change-mode", "warn", "--yes")
@@ -431,6 +449,29 @@ def test_installed_lint_script_validates_policy_without_package_import(tmp_path:
     assert "required_sections[0].name must be a non-empty string" in output
     assert "ci.provider must be one of: auto, github, gitlab, jenkins, buildkite, codeup, none" in output
     assert "behavior_tests.enabled_by_default must be a boolean" in output
+
+
+def test_installed_autofix_script_validates_policy_without_package_import(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path, "standalone-autofix")
+    proc = run_cli("init", "--repo", str(repo), "--preset", "generic", "--ci", "none", "--yes", "--skip-verify")
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+    policy_path = repo / ".claude-governance" / "policy.json"
+    policy = json.loads(policy_path.read_text(encoding="utf-8"))
+    policy["root_doc"]["max_lines"] = True
+    policy_path.write_text(json.dumps(policy), encoding="utf-8")
+
+    autofix = subprocess.run(
+        [sys.executable, "-S", "scripts/claude_md_autofix.py", "--apply"],
+        cwd=repo,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+
+    assert autofix.returncode == 2
+    assert "root_doc.max_lines must be a non-negative integer" in autofix.stderr
 
 
 def test_jenkins_init_installs_pipeline_and_verifies(tmp_path: Path) -> None:

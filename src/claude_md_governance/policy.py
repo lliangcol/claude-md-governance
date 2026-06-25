@@ -6,7 +6,11 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .policy_schema import PolicyValidationError, load_policy_file, validate_policy
+from .policy_schema import (
+    PolicyValidationError as PolicyValidationError,
+    load_policy_file as load_policy_file,
+    validate_policy as validate_policy,
+)
 
 ROOT_DOC_KEYS = ("root_doc", "root_agents", "root_claude")
 DEFAULT_ROOT_DOC_PATH = "AGENTS.md"
