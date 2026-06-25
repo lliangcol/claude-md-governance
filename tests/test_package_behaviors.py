@@ -314,7 +314,18 @@ def test_codeup_init_does_not_create_github_actions(tmp_path: Path) -> None:
     proc = run_cli("init", "--repo", str(repo), "--preset", "enterprise-java-codeup", "--ci", "codeup", "--config-change-mode", "warn", "--yes")
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert not (repo / ".github" / "workflows" / "claude-md-governance.yml").exists()
+    assert (repo / "ci" / "codeup" / "claude-md-governance-step.yml").exists()
     assert (repo / "docs" / "ci" / "codeup-claude-md-governance.md").exists()
+    policy = json.loads((repo / ".claude-governance" / "policy.json").read_text(encoding="utf-8"))
+    assert policy["ci"]["provider"] == "codeup"
+
+    step = (repo / "ci" / "codeup" / "claude-md-governance-step.yml").read_text(encoding="utf-8")
+    assert "python scripts/claude_md_lint.py" in step
+    assert "python scripts/verify_claude_governance.py" in step
+
+    verify = run_cli("verify", "--repo", str(repo))
+    assert verify.returncode == 0, verify.stdout + verify.stderr
+    assert "PASS: Codeup CI instructions exist" in verify.stdout
 
 
 def test_gitlab_init_installs_pipeline_and_verifies(tmp_path: Path) -> None:
@@ -392,6 +403,36 @@ def test_installed_verify_script_allows_parallel_runs(tmp_path: Path) -> None:
     assert not list((repo / "scripts").glob(".verify_allowlist_*.py"))
 
 
+def test_installed_lint_script_validates_policy_without_package_import(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path, "standalone-lint")
+    proc = run_cli("init", "--repo", str(repo), "--preset", "generic", "--ci", "none", "--yes", "--skip-verify")
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+    policy_path = repo / ".claude-governance" / "policy.json"
+    policy = json.loads(policy_path.read_text(encoding="utf-8"))
+    policy["root_doc"]["max_lines"] = True
+    policy["required_sections"] = [{"name": "", "aliases": [""], "severity": "fatal", "deduction": False}]
+    policy["ci"] = {"provider": "travis"}
+    policy["behavior_tests"] = {"enabled_by_default": "yes", "case_file": ""}
+    policy_path.write_text(json.dumps(policy), encoding="utf-8")
+
+    lint = subprocess.run(
+        [sys.executable, "-S", "scripts/claude_md_lint.py", "--policy", ".claude-governance/policy.json", "--quiet"],
+        cwd=repo,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+
+    assert lint.returncode == 2
+    output = lint.stdout + lint.stderr
+    assert "root_doc.max_lines must be a non-negative integer" in output
+    assert "required_sections[0].name must be a non-empty string" in output
+    assert "ci.provider must be one of: auto, github, gitlab, jenkins, buildkite, codeup, none" in output
+    assert "behavior_tests.enabled_by_default must be a boolean" in output
+
+
 def test_jenkins_init_installs_pipeline_and_verifies(tmp_path: Path) -> None:
     repo = make_repo(tmp_path, "jenkins")
     proc = run_cli("init", "--repo", str(repo), "--preset", "generic", "--ci", "jenkins", "--yes")
@@ -408,6 +449,18 @@ def test_jenkins_init_installs_pipeline_and_verifies(tmp_path: Path) -> None:
     assert "PASS: Jenkins pipeline exists" in verify.stdout
 
 
+def test_jenkins_pipeline_requires_change_request_and_governance_changes(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path, "jenkins-rules")
+    proc = run_cli("init", "--repo", str(repo), "--preset", "generic", "--ci", "jenkins", "--yes", "--skip-verify")
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+    pipeline = (repo / "Jenkinsfile").read_text(encoding="utf-8")
+    assert "allOf {\n          changeRequest()\n          anyOf {" in pipeline
+    assert "changeset '.claude-governance/**'" in pipeline
+    assert "changeset 'scripts/verify_claude_governance.py'" in pipeline
+    assert "anyOf {\n          changeRequest()\n          changeset" not in pipeline
+
+
 def test_buildkite_init_installs_pipeline_and_verifies(tmp_path: Path) -> None:
     repo = make_repo(tmp_path, "buildkite")
     proc = run_cli("init", "--repo", str(repo), "--preset", "generic", "--ci", "buildkite", "--yes")
@@ -419,6 +472,10 @@ def test_buildkite_init_installs_pipeline_and_verifies(tmp_path: Path) -> None:
     assert not (repo / "Jenkinsfile").exists()
     policy = json.loads((repo / ".claude-governance" / "policy.json").read_text(encoding="utf-8"))
     assert policy["ci"]["provider"] == "buildkite"
+    pipeline = (repo / ".buildkite" / "pipeline.yml").read_text(encoding="utf-8")
+    assert "python scripts/claude_md_lint.py" in pipeline
+    assert "python scripts/verify_claude_governance.py" in pipeline
+    assert '".claude-governance/score.json"' in pipeline
 
     verify = run_cli("verify", "--repo", str(repo))
     assert verify.returncode == 0, verify.stdout + verify.stderr
@@ -852,3 +909,26 @@ def test_policy_schema_reports_multiple_invalid_shapes() -> None:
     assert "preset must be a non-empty string" in errors
     assert "hooks.config_change_mode must be one of: block, warn, off" in errors
     assert "ci.provider must be one of: auto, github, gitlab, jenkins, buildkite, codeup, none" in errors
+
+
+def test_policy_schema_rejects_container_shape_edges() -> None:
+    invalid = {
+        "version": 1,
+        "preset": "generic",
+        "root_agents": [],
+        "root_claude": {"path": "CLAUDE.md", "warn_tokens": True},
+        "required_sections": "Project Overview",
+        "sensitive_paths": "src/auth/**",
+        "hooks": [],
+        "ci": "github",
+        "behavior_tests": [],
+    }
+
+    errors = validate_policy(invalid)
+    assert "root_agents must be an object" in errors
+    assert "root_claude.warn_tokens must be a non-negative integer" in errors
+    assert "required_sections must be an array" in errors
+    assert "sensitive_paths must be an array" in errors
+    assert "hooks must be an object" in errors
+    assert "ci must be an object" in errors
+    assert "behavior_tests must be an object" in errors

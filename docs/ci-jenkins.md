@@ -21,7 +21,7 @@ codex-md-governance init --repo . --preset generic --ci jenkins --yes
 
 ## Pipeline 内容
 
-默认 stage 运行：
+默认 stage 仅在 change request 触及治理相关文件时运行：
 
 ```bash
 python scripts/claude_md_lint.py --policy .claude-governance/policy.json --output .claude-governance/score.json

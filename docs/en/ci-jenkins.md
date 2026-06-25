@@ -21,7 +21,7 @@ Failure handling:
 
 ## Pipeline Contents
 
-The default stage runs:
+The default stage runs only for change requests that touch governance-related files:
 
 ```bash
 python scripts/claude_md_lint.py --policy .claude-governance/policy.json --output .claude-governance/score.json

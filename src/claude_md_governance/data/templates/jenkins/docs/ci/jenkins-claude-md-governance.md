@@ -1,6 +1,6 @@
 # Jenkins AGENTS.md Governance
 
-This repository is configured for Jenkins. The installed `Jenkinsfile` runs deterministic governance checks for change requests and governance-related file changes.
+This repository is configured for Jenkins. The installed `Jenkinsfile` runs deterministic governance checks only for change requests that touch root or local instruction files, governance policy, hook settings, or governance scripts.
 
 The required commands are:
 

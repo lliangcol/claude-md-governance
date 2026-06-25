@@ -4,18 +4,20 @@ pipeline {
   stages {
     stage('AGENTS.md Governance') {
       when {
-        anyOf {
+        allOf {
           changeRequest()
-          changeset 'AGENTS.md'
-          changeset '**/AGENTS.md'
-          changeset 'CLAUDE.md'
-          changeset '**/CLAUDE.md'
-          changeset '.claude-governance/**'
-          changeset '.claude/**'
-          changeset '.codex/**'
-          changeset 'scripts/claude_*'
-          changeset 'scripts/verify_claude_governance.py'
-          changeset 'Jenkinsfile'
+          anyOf {
+            changeset 'AGENTS.md'
+            changeset '**/AGENTS.md'
+            changeset 'CLAUDE.md'
+            changeset '**/CLAUDE.md'
+            changeset '.claude-governance/**'
+            changeset '.claude/**'
+            changeset '.codex/**'
+            changeset 'scripts/claude_*'
+            changeset 'scripts/verify_claude_governance.py'
+            changeset 'Jenkinsfile'
+          }
         }
       }
       steps {
