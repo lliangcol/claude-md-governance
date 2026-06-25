@@ -21,7 +21,7 @@ codex-md-governance init --repo . --preset generic --ci gitlab --yes
 
 ## Pipeline 内容
 
-默认 job 使用 `python:3.11-slim`，运行：
+默认 job 使用 `python:3.11-slim`，仅在 merge request pipeline 触及治理相关文件时运行：
 
 ```bash
 python scripts/claude_md_lint.py --policy .claude-governance/policy.json --output .claude-governance/score.json

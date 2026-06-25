@@ -20,7 +20,7 @@ files.
 - Current worktree was clean at the start of the 2026-06-25 maintenance round,
   with `HEAD...@{u}` at `0 0`.
 - Latest pushed maintenance commit before the current round:
-  - `e9e079e test: harden verify script smoke coverage`
+  - `25de518 test: cover standalone hook guard validation`
 - `dist/`, caches, `*.egg-info`, local reports, and private machine paths must
   not be committed.
 
@@ -87,9 +87,8 @@ Latest validation run after fallback-validator alignment:
 
 Current round targeted validation:
 
-- `.\.venv\Scripts\python.exe -m pytest tests\test_package_behaviors.py::test_installed_hook_guard_validates_policy_without_package_import -q`: passed.
-- `.\.venv\Scripts\python.exe -m pytest tests\test_package_behaviors.py::test_installed_verify_script_validates_policy_without_package_import tests\test_package_behaviors.py::test_installed_verify_script_allows_parallel_runs -q`: passed.
-- `.\.venv\Scripts\python.exe -m pytest -q`: passed, `87 passed`.
+- `.\.venv\Scripts\python.exe -m pytest tests\test_package_behaviors.py::test_gitlab_init_installs_pipeline_and_verifies tests\test_package_behaviors.py::test_gitlab_pipeline_rules_require_merge_request_and_governance_changes -q`: passed.
+- `.\.venv\Scripts\python.exe -m pytest -q`: passed, `88 passed`.
 - `git diff --check`: passed.
 - `.\.venv\Scripts\python.exe scripts\claude_md_lint.py --policy .claude-governance\policy.json --output .claude-governance\score.json`: passed, score `100`.
 - `.\.venv\Scripts\python.exe scripts\verify_claude_governance.py`: passed.
@@ -109,8 +108,9 @@ Current round targeted validation:
 
 ## Highest Priority Candidates
 
-1. P1: Pick exactly one new CI provider and verify installer, template, docs,
-   fixture, and smoke behavior end to end.
+1. P1: Continue one-provider CI validation. GitLab installer, template, docs,
+   package data, verify smoke, and MR+changes rule shape are covered; remaining
+   provider checks can focus on Jenkins, Buildkite, or Codeup.
 2. P0: Continue policy schema regression coverage for edge cases not covered by
    `test_verify_script_fallback_policy_validator_matches_core_schema`.
 3. P0: Continue focused installed-template smoke coverage for copied script
@@ -122,10 +122,8 @@ Current round targeted validation:
 ## Next Candidate
 
 The fallback validator comparison is complete; the installed verify-script
-no-package smoke regression, concurrent verify cleanup behavior, and installed
-hook-guard no-package smoke regression are covered. The next implementation
-slice should either continue installed-script smoke coverage or pick exactly one
-CI provider, preferably GitLab because working-tree evidence already contains
-GitLab installer support, template files, and docs. A correct GitLab slice
-likely exceeds three files, so either get explicit approval to widen that round
-or split it carefully without shipping a partially usable provider.
+no-package smoke regression, concurrent verify cleanup behavior, installed
+hook-guard no-package smoke regression, and GitLab MR+changes CI rule shape are
+covered. The next implementation slice should either continue installed-script
+smoke coverage or pick one remaining CI provider for targeted end-to-end
+validation.

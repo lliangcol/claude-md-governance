@@ -21,7 +21,7 @@ Failure handling:
 
 ## Pipeline Contents
 
-The default job uses `python:3.11-slim` and runs:
+The default job uses `python:3.11-slim` and runs only for merge request pipelines that touch governance-related files:
 
 ```bash
 python scripts/claude_md_lint.py --policy .claude-governance/policy.json --output .claude-governance/score.json

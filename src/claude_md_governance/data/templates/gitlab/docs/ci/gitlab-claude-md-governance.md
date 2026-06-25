@@ -1,6 +1,6 @@
 # GitLab CI AGENTS.md Governance
 
-This repository is configured for GitLab CI. The installed `.gitlab-ci.yml` runs deterministic governance checks when merge requests touch root or local instruction files, governance policy, hook settings, or governance scripts.
+This repository is configured for GitLab CI. The installed `.gitlab-ci.yml` runs deterministic governance checks only for merge request pipelines that touch root or local instruction files, governance policy, hook settings, or governance scripts.
 
 The required commands are:
 

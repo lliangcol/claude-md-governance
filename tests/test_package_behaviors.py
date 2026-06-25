@@ -332,6 +332,18 @@ def test_gitlab_init_installs_pipeline_and_verifies(tmp_path: Path) -> None:
     assert "PASS: GitLab CI pipeline exists" in verify.stdout
 
 
+def test_gitlab_pipeline_rules_require_merge_request_and_governance_changes(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path, "gitlab-rules")
+    proc = run_cli("init", "--repo", str(repo), "--preset", "generic", "--ci", "gitlab", "--yes", "--skip-verify")
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+    pipeline = (repo / ".gitlab-ci.yml").read_text(encoding="utf-8")
+    assert "    - if: '$CI_PIPELINE_SOURCE == \"merge_request_event\"'\n      changes:\n" in pipeline
+    assert "    - if: '$CI_PIPELINE_SOURCE == \"merge_request_event\"'\n  script:\n" not in pipeline
+    assert '        - ".claude-governance/**/*"' in pipeline
+    assert '        - "scripts/verify_claude_governance.py"' in pipeline
+
+
 def test_installed_verify_script_validates_policy_without_package_import(tmp_path: Path) -> None:
     repo = make_repo(tmp_path, "standalone-verify")
     proc = run_cli("init", "--repo", str(repo), "--preset", "generic", "--ci", "none", "--yes", "--skip-verify")
