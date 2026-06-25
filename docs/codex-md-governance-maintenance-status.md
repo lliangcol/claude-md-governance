@@ -19,8 +19,8 @@ files.
 - Baseline install: `.venv\Scripts\python.exe -m pip install -e ".[test]"`.
 - Current worktree was clean at the start of the 2026-06-25 maintenance round,
   with `HEAD...@{u}` at `0 0`.
-- Latest pushed maintenance commits:
-  - `97a3018 feat: expand governance providers and reports`
+- Latest pushed maintenance commit before the current round:
+  - `e9e079e test: harden verify script smoke coverage`
 - `dist/`, caches, `*.egg-info`, local reports, and private machine paths must
   not be committed.
 
@@ -87,8 +87,9 @@ Latest validation run after fallback-validator alignment:
 
 Current round targeted validation:
 
+- `.\.venv\Scripts\python.exe -m pytest tests\test_package_behaviors.py::test_installed_hook_guard_validates_policy_without_package_import -q`: passed.
 - `.\.venv\Scripts\python.exe -m pytest tests\test_package_behaviors.py::test_installed_verify_script_validates_policy_without_package_import tests\test_package_behaviors.py::test_installed_verify_script_allows_parallel_runs -q`: passed.
-- `.\.venv\Scripts\python.exe -m pytest -q`: passed, `86 passed`.
+- `.\.venv\Scripts\python.exe -m pytest -q`: passed, `87 passed`.
 - `git diff --check`: passed.
 - `.\.venv\Scripts\python.exe scripts\claude_md_lint.py --policy .claude-governance\policy.json --output .claude-governance\score.json`: passed, score `100`.
 - `.\.venv\Scripts\python.exe scripts\verify_claude_governance.py`: passed.
@@ -114,15 +115,15 @@ Current round targeted validation:
    `test_verify_script_fallback_policy_validator_matches_core_schema`.
 3. P0: Continue focused installed-template smoke coverage for copied script
    behavior when the target repository does not have the package import
-   available. The installed `verify_claude_governance.py` fallback validator is
-   covered; remaining copied scripts can still use targeted no-package smoke
-   tests.
+   available. The installed `verify_claude_governance.py` fallback validator
+   and installed `claude_hook_guard.py` fallback validator are covered;
+   remaining copied scripts can still use targeted no-package smoke tests.
 
 ## Next Candidate
 
-The fallback validator comparison is complete and pushed in `97a3018`; the
-installed verify-script no-package smoke regression and concurrent verify
-cleanup behavior are covered in the current round. The next implementation
+The fallback validator comparison is complete; the installed verify-script
+no-package smoke regression, concurrent verify cleanup behavior, and installed
+hook-guard no-package smoke regression are covered. The next implementation
 slice should either continue installed-script smoke coverage or pick exactly one
 CI provider, preferably GitLab because working-tree evidence already contains
 GitLab installer support, template files, and docs. A correct GitLab slice

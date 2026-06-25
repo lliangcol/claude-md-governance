@@ -522,6 +522,33 @@ def test_pre_hook_blocks_and_allows_protected_path(tmp_path: Path) -> None:
     assert nested_allowed.returncode == 0
 
 
+def test_installed_hook_guard_validates_policy_without_package_import(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path, "standalone-hook")
+    proc = run_cli("init", "--repo", str(repo), "--preset", "generic", "--ci", "none", "--yes", "--skip-verify")
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+    policy_path = repo / ".claude-governance" / "policy.json"
+    policy = json.loads(policy_path.read_text(encoding="utf-8"))
+    policy["hooks"]["config_change_mode"] = "invalid"
+    policy_path.write_text(json.dumps(policy), encoding="utf-8")
+
+    event = json.dumps({"tool_input": {"file_path": "README.md"}})
+    hook = subprocess.run(
+        [sys.executable, "-S", "scripts/claude_hook_guard.py", "pre"],
+        cwd=repo,
+        input=event,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+
+    assert hook.returncode == 2
+    output = hook.stdout + hook.stderr
+    assert "Invalid policy file" in output
+    assert "hooks.config_change_mode must be one of: block, warn, off" in output
+
+
 def test_post_hook_runs_sensitive_checks_for_nested_paths(tmp_path: Path) -> None:
     repo = make_repo(tmp_path, "nested-post")
     assert run_cli("init", "--repo", str(repo), "--preset", "generic", "--ci", "none", "--yes").returncode == 0
