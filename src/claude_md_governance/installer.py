@@ -341,9 +341,13 @@ def path_matches(candidate: str, pattern: str) -> bool:
     return any(fnmatch.fnmatch(v, pattern.replace("\\", "/")) for v in variants)
 
 
+def local_doc_field(item: Dict[str, Any]) -> str:
+    return str(item.get("local_doc") or item.get("local_agents") or item.get("local_claude") or "")
+
+
 def find_sensitive_dirs(repo: Path, item: Dict[str, Any]) -> List[str]:
     pattern = str(item.get("path", ""))
-    local = str(item.get("local_claude", ""))
+    local = local_doc_field(item)
     keywords = [str(k).lower() for k in item.get("detect_keywords", [])]
     results: List[str] = []
     if "{dir}" not in local and local:
@@ -366,7 +370,7 @@ def find_sensitive_dirs(repo: Path, item: Dict[str, Any]) -> List[str]:
 
 def local_path_for(item: Dict[str, Any], matched_dir: str, doc_name: str = "CLAUDE.md") -> str:
     module = Path(matched_dir).name
-    local = str(item.get("local_doc") or item.get("local_agents") or item.get("local_claude", ""))
+    local = local_doc_field(item)
     if doc_name.upper() == "AGENTS.MD" and "local_agents" not in item and local.endswith("CLAUDE.md"):
         local = local.removesuffix("CLAUDE.md") + "AGENTS.md"
     return local.replace("{dir}", matched_dir).replace("{module}", module)

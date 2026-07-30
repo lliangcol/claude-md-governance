@@ -125,6 +125,28 @@ def test_sensitive_keywords_do_not_create_false_positive_without_path_match(tmp_
     assert lint.find_sensitive_dirs(repo, policy["sensitive_paths"][0]) == []
 
 
+def test_missing_local_doc_detected_for_local_agents_only_sensitive_path(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path, "agents-only-sensitive")
+    assert run_cli("init", "--repo", str(repo), "--preset", "generic", "--ci", "none", "--yes").returncode == 0
+    policy = json.loads((repo / ".claude-governance" / "policy.json").read_text(encoding="utf-8"))
+    policy["sensitive_paths"] = [
+        {
+            "id": "payments",
+            "path": "src/payments/**",
+            "local_agents": "src/payments/AGENTS.md",
+            "protected": True,
+        }
+    ]
+    (repo / ".claude-governance" / "policy.json").write_text(json.dumps(policy), encoding="utf-8")
+    (repo / "src" / "payments").mkdir(parents=True)
+
+    proc = run_cli("lint", "--repo", str(repo), "--quiet")
+    assert proc.returncode == 1
+    (repo / "src" / "payments" / "AGENTS.md").write_text("# Payments Module Rules\n", encoding="utf-8")
+    proc_fixed = run_cli("lint", "--repo", str(repo), "--quiet")
+    assert proc_fixed.returncode == 0, proc_fixed.stdout + proc_fixed.stderr
+
+
 def test_lint_requires_hook_matcher_coverage_for_all_edit_tools(tmp_path: Path) -> None:
     repo = make_repo(tmp_path, "hook-coverage")
     assert run_cli("init", "--repo", str(repo), "--preset", "generic", "--ci", "none", "--yes").returncode == 0

@@ -192,9 +192,13 @@ def glob_has_matches(repo: Path, pattern: str) -> bool:
     return False
 
 
+def local_doc_field(item: Dict[str, Any]) -> str:
+    return str(item.get("local_doc") or item.get("local_agents") or item.get("local_claude") or "")
+
+
 def find_sensitive_dirs(repo: Path, item: Dict[str, Any]) -> List[str]:
     pattern = str(item.get("path", ""))
-    local = str(item.get("local_claude", ""))
+    local = local_doc_field(item)
     keywords = [str(k).lower() for k in item.get("detect_keywords", [])]
     results: List[str] = []
 
@@ -218,7 +222,7 @@ def find_sensitive_dirs(repo: Path, item: Dict[str, Any]) -> List[str]:
 
 
 def local_path_for(item: Dict[str, Any], matched_dir: str, doc_name: str = "CLAUDE.md") -> str:
-    local = str(item.get("local_doc") or item.get("local_agents") or item.get("local_claude", ""))
+    local = local_doc_field(item)
     if doc_name.upper() == "AGENTS.MD" and "local_agents" not in item and local.endswith("CLAUDE.md"):
         local = local.removesuffix("CLAUDE.md") + "AGENTS.md"
     module = Path(matched_dir).name
@@ -403,7 +407,7 @@ def lint(repo: Path, policy: Dict[str, Any], claude_path: Path) -> Dict[str, Any
 
     for item in policy.get("sensitive_paths", []):
         pattern = item.get("path")
-        local = item.get("local_claude")
+        local = local_doc_field(item)
         if not pattern or not local:
             continue
         dirs = find_sensitive_dirs(repo, item)
